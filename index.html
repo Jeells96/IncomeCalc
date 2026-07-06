@@ -1,98 +1,1200 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oregon Paycheck Take-Home Calculator</title>
-    <style>
-        body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 30px auto; padding: 20px; background: #f8fafc; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin-bottom: 25px; }
-        label { display: block; margin: 12px 0 5px; font-weight: 600; }
-        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
-        button { padding: 12px 24px; background: #1e40af; color: white; border: none; border-radius: 8px; cursor: pointer; }
-        .result { font-size: 1.4rem; font-weight: bold; color: #166534; }
-        .official { color: #1e40af; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Take-Home — Oregon Paycheck Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#121821;
+    --paper:#faf9f6;
+    --paper-line:#e4e0d8;
+    --ink:#1b2430;
+    --ink-soft:#4b5563;
+    --muted:#7c8592;
+    --green:#2f5d50;
+    --green-light:#4c8c74;
+    --green-pale:#e7efe9;
+    --amber:#c97a2b;
+    --amber-pale:#f8ead9;
+    --red:#a4432f;
+    --shadow: 0 20px 60px -20px rgba(0,0,0,0.5);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% 0%, #1c2530 0%, transparent 55%),
+      radial-gradient(circle at 90% 20%, #16351f22 0%, transparent 45%),
+      var(--bg);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    padding:40px 16px 80px;
+  }
+  .wrap{max-width:680px; margin:0 auto;}
+  .masthead{text-align:center; color:#f2f0ea; margin-bottom:28px;}
+  .masthead .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.18em;
+    text-transform:uppercase; color:var(--green-light); margin-bottom:10px;
+  }
+  .masthead h1{font-family:'Fraunces', serif; font-weight:600; font-size:42px; line-height:1.05; margin:0 0 8px;}
+  .masthead p{font-size:14px; color:#a9b0ba; margin:0;}
+
+  .tabs{display:flex; gap:6px; justify-content:center; margin-bottom:22px; flex-wrap:wrap;}
+  .tab-btn{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.05em; text-transform:uppercase;
+    background:transparent; border:1px solid #3a4351; color:#c3c9d1; padding:9px 18px;
+    border-radius:999px; cursor:pointer; transition:all .15s ease;
+  }
+  .tab-btn.active{background:var(--green-light); border-color:var(--green-light); color:#0d1611; font-weight:600;}
+  .tab-btn:hover:not(.active){border-color:var(--green-light); color:#fff;}
+
+  .panel{
+    background:var(--paper); border-radius:14px; box-shadow:var(--shadow);
+    padding:32px 30px 28px; margin-bottom:20px; position:relative; display:none;
+  }
+  .panel.active{display:block;}
+  .panel.perforated::before{
+    content:""; position:absolute; top:-1px; left:24px; right:24px; height:0;
+    border-top:2px dashed #d8d2c4;
+  }
+
+  h2.section-title{font-family:'Fraunces', serif; font-size:21px; font-weight:600; margin:0 0 4px;}
+  .section-sub{font-size:12.5px; color:var(--muted); margin:0 0 20px;}
+
+  .field-row{display:flex; gap:14px; margin-bottom:14px;}
+  .field{flex:1; display:flex; flex-direction:column; gap:6px;}
+  label{font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft);}
+  input[type=number], input[type=text], select{
+    font-family:'IBM Plex Mono', monospace; font-size:15px; padding:10px 12px;
+    border:1.5px solid var(--paper-line); border-radius:8px; background:#fff; color:var(--ink); width:100%;
+  }
+  input:focus, select:focus{outline:none; border-color:var(--green-light); box-shadow:0 0 0 3px var(--green-pale);}
+
+  .segmented{display:flex; border:1.5px solid var(--paper-line); border-radius:8px; overflow:hidden; flex-wrap:wrap;}
+  .segmented button{
+    flex:1; padding:10px 8px; border:none; background:#fff; font-family:'Inter'; font-size:12.5px;
+    font-weight:600; color:var(--ink-soft); cursor:pointer; min-width:100px;
+  }
+  .segmented button.active{background:var(--green); color:#fff;}
+
+  .checkline{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft); margin:2px 0 14px;}
+  .checkline input{width:15px; height:15px;}
+
+  details.advanced{margin:6px 0 18px; border-top:1px solid var(--paper-line); padding-top:12px;}
+  details.advanced summary{cursor:pointer; font-size:12.5px; font-weight:600; color:var(--green); text-transform:uppercase; letter-spacing:0.04em;}
+  details.advanced .field-row{margin-top:14px;}
+
+  .btn{font-family:'Inter'; font-weight:700; font-size:14.5px; padding:13px 20px; border-radius:9px; border:none; cursor:pointer; width:100%;}
+  .btn-primary{background:var(--green); color:#fff;}
+  .btn-primary:hover{background:var(--green-light);}
+  .btn-secondary{background:#fff; color:var(--green); border:1.5px solid var(--green); margin-top:10px;}
+  .btn-secondary:hover{background:var(--green-pale);}
+  .btn-ghost{background:transparent; color:var(--muted); border:1px solid var(--paper-line); font-weight:600; font-size:12.5px; padding:8px 14px; width:auto;}
+
+  .default-strip{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--ink-soft); background:var(--green-pale);
+    border:1px solid #cfe0d5; border-radius:8px; padding:10px 14px; margin-bottom:20px;
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .default-strip button{background:none; border:none; color:var(--green); font-weight:700; cursor:pointer; font-family:'Inter'; font-size:11.5px; text-decoration:underline;}
+
+  .daily-table{width:100%; border-collapse:collapse; margin-bottom:16px;}
+  .daily-table th{font-size:10.5px; text-transform:uppercase; color:var(--muted); text-align:left; padding:4px 6px;}
+  .daily-table td{padding:4px 6px;}
+  .daily-table input{padding:8px; font-size:13.5px;}
+  .daily-hint{font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--muted); text-align:right; padding-top:6px;}
+
+  .result-hero{text-align:center; padding:6px 0 22px; border-bottom:1px solid var(--paper-line); margin-bottom:20px;}
+  .result-hero .label{font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.14em; color:var(--muted);}
+  .result-hero .amount{font-family:'Fraunces', serif; font-weight:700; font-size:54px; color:var(--green); margin:6px 0 2px;}
+  .result-hero .sub{font-size:12.5px; color:var(--muted);}
+
+  .proj-row{display:flex; gap:10px; margin-bottom:22px;}
+  .proj-card{flex:1; background:#fff; border:1px solid var(--paper-line); border-radius:10px; padding:12px 10px; text-align:center;}
+  .proj-card .k{font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);}
+  .proj-card .v{font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:15.5px; color:var(--ink); margin-top:3px;}
+
+  table.ledger{width:100%; border-collapse:collapse; margin-bottom:22px; font-family:'IBM Plex Mono', monospace; font-size:13.5px;}
+  table.ledger tr{border-bottom:1px dashed var(--paper-line);}
+  table.ledger tr:last-child{border-bottom:none;}
+  table.ledger td{padding:8px 2px;}
+  table.ledger td.amt{text-align:right; white-space:nowrap;}
+  table.ledger tr.deduct td.amt{color:var(--red);}
+  table.ledger tr.info-row td{color:var(--muted); font-style:italic; font-size:12px; padding:2px 2px;}
+  table.ledger tr.info-row td.amt{color:var(--muted);}
+  table.ledger tr.net td{font-weight:700; font-size:15px; padding-top:12px; border-top:2px solid var(--ink);}
+  table.ledger tr.net td.amt{color:var(--green);}
+
+  .ladder-block{margin-bottom:20px;}
+  .ladder-title{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-bottom:8px; display:flex; justify-content:space-between;}
+  .ladder-title span.rate{color:var(--green); font-family:'IBM Plex Mono',monospace;}
+  .ladder-bar{display:flex; height:20px; border-radius:6px; overflow:hidden; border:1px solid var(--paper-line); position:relative;}
+  .ladder-seg{height:100%;}
+  .ladder-marker{position:absolute; top:-5px; width:2px; height:30px; background:var(--ink);}
+  .ladder-marker::after{content:""; position:absolute; top:-5px; left:-4px; border-left:5px solid transparent; border-right:5px solid transparent; border-top:6px solid var(--ink);}
+
+  .compare-box{background:var(--amber-pale); border:1px solid #e8cda3; border-radius:10px; padding:16px 16px; margin-bottom:20px;}
+  .compare-box h3{font-family:'Fraunces', serif; font-size:16px; margin:0 0 10px; color:#7a4a19;}
+  .compare-row{display:flex; justify-content:space-between; font-size:13px; padding:4px 0; font-family:'IBM Plex Mono', monospace;}
+  .compare-row .delta.up{color:var(--green);}
+  .compare-row .delta.down{color:var(--red);}
+  .bump-alert{margin-top:10px; padding:10px 12px; background:#fff; border-left:3px solid var(--amber); font-size:12.5px; border-radius:4px; color:#5a3d1a;}
+
+  .settings-subtabs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:22px;}
+  .settings-subtab{
+    font-family:'Inter'; font-size:12px; font-weight:700; padding:7px 13px; border-radius:7px;
+    border:1px solid var(--paper-line); background:#fff; color:var(--ink-soft); cursor:pointer;
+  }
+  .settings-subtab.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+
+  .settings-section{display:none;}
+  .settings-section.active{display:block;}
+  .settings-group{margin-bottom:26px;}
+  .settings-group h3{font-family:'Fraunces', serif; font-size:17px; margin:0 0 4px;}
+  .settings-note{font-size:11.5px; color:var(--muted); margin:0 0 12px;}
+  table.bracket-editor{width:100%; border-collapse:collapse; margin-bottom:8px;}
+  table.bracket-editor th{font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); text-align:left; padding:4px 6px;}
+  table.bracket-editor td{padding:4px 6px;}
+  table.bracket-editor input{padding:7px 8px; font-size:13px;}
+  .row-actions button{background:none; border:none; color:var(--red); cursor:pointer; font-size:16px; line-height:1;}
+  .add-row-btn{font-size:12px; font-weight:600; color:var(--green); background:none; border:1px dashed var(--green-light); border-radius:6px; padding:6px 12px; cursor:pointer; margin-top:4px;}
+  .settings-actions{display:flex; gap:10px; margin-top:8px; position:sticky; bottom:0; background:var(--paper); padding-top:14px;}
+  .settings-actions .btn{width:auto; flex:1;}
+
+  select.type-select{font-family:'Inter'; font-size:13px; padding:9px 8px;}
+
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff;
+    padding:10px 20px; border-radius:999px; font-size:13px; font-family:'Inter'; box-shadow:var(--shadow);
+    opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:50;
+  }
+  .toast.show{opacity:1;}
+  footer{text-align:center; color:#7c8592; font-size:11px; margin-top:10px;}
+
+  @media (max-width:520px){
+    .masthead h1{font-size:32px;}
+    .panel{padding:24px 18px 22px;}
+    .field-row{flex-direction:column; gap:10px;}
+    .proj-row{flex-direction:column;}
+    .result-hero .amount{font-size:42px;}
+  }
+</style>
 </head>
 <body>
-    <div class="card">
-        <h1>Oregon Paycheck Take-Home Calculator</h1>
-        <p class="official">Using 2025 Oregon rates • <a href="https://www.oregon.gov/dor/programs/individuals/pages/pit.aspx" target="_blank">Official DOR Page (Latest PDF)</a></p>
+<div class="wrap">
+
+  <div class="masthead">
+    <div class="eyebrow">Weekly Wage Ledger</div>
+    <h1>Take-Home</h1>
+    <p>Oregon · Married Filing Jointly · Tax year 2026</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="calc">Calculate</button>
+    <button class="tab-btn" data-tab="settings">Settings</button>
+  </div>
+
+  <!-- CALCULATE PANEL -->
+  <section class="panel active" id="panel-calc">
+
+    <div id="defaultStrip" style="display:none;" class="default-strip">
+      <span id="defaultStripText"></span>
+      <button id="clearDefaultBtn">clear</button>
     </div>
 
-    <div class="card">
-        <label>Pay Type: 
-            <select id="payType" onchange="calculate()">
-                <option value="hourly">Hourly</option>
-                <option value="salary">Annual Salary</option>
-            </select>
-        </label>
-        <label>Hourly Rate ($):</label>
-        <input type="number" id="payRate" value="67.24" step="0.01" oninput="calculate()">
-        <label>Hours per week:</label>
-        <input type="number" id="hours" value="40" step="0.1" oninput="calculate()">
-        <label>Pay Frequency:
-            <select id="frequency" onchange="calculate()">
-                <option value="biweekly" selected>Bi-weekly</option>
-                <option value="weekly">Weekly</option>
-            </select>
-        </label>
+    <h2 class="section-title">This week's pay</h2>
+    <p class="section-sub">Enter what you earned this pay period. Household details and rates now live under Settings.</p>
+
+    <div class="field" style="margin-bottom:16px;">
+      <label>Pay entry</label>
+      <div class="segmented">
+        <button type="button" class="seg-btn active" data-pay="weeklyHourly">Hourly — weekly total</button>
+        <button type="button" class="seg-btn" data-pay="dailyHourly">Hourly — daily entry</button>
+        <button type="button" class="seg-btn" data-pay="salary">Weekly amount</button>
+      </div>
     </div>
 
-    <div class="card">
-        <label>Filing Status:
-            <select id="filing" onchange="calculate()">
-                <option value="single">Single</option>
-                <option value="married" selected>Married Jointly / HoH</option>
-            </select>
-        </label>
-        <label>Pre-tax deductions per pay ($ e.g. 401k, insurance):</label>
-        <input type="number" id="pretax" value="0" oninput="calculate()">
-        <label>Extra Federal Withholding per pay ($):</label>
-        <input type="number" id="extraFed" value="0" oninput="calculate()">
+    <!-- Weekly total hourly -->
+    <div id="weeklyHourlyFields">
+      <div class="field-row">
+        <div class="field"><label>Hourly rate ($)</label><input type="number" id="hourlyRate" step="0.01" value="30.00"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Regular hours</label><input type="number" id="regHours" step="0.25" value="40"></div>
+        <div class="field"><label>Time-and-a-half hours</label><input type="number" id="otHours" step="0.25" value="0"></div>
+        <div class="field"><label>Double-time hours</label><input type="number" id="dtHours" step="0.25" value="0"></div>
+      </div>
     </div>
 
-    <div class="card">
-        <button onclick="calculate()">Calculate Take-Home</button>
+    <!-- Daily entry hourly -->
+    <div id="dailyHourlyFields" style="display:none;">
+      <div class="field-row">
+        <div class="field"><label>Hourly rate ($)</label><input type="number" id="hourlyRateDaily" step="0.01" value="30.00"></div>
+      </div>
+      <p class="section-sub" style="margin-bottom:10px;">Daily thresholds (from Settings → Hours) split each day into regular / time-and-a-half / double-time automatically.</p>
+      <table class="daily-table">
+        <thead><tr><th>Day</th><th>Hours worked</th></tr></thead>
+        <tbody id="dailyRows"></tbody>
+      </table>
+      <div class="daily-hint" id="dailyBreakdownHint"></div>
     </div>
 
-    <div class="card" id="results"></div>
-
-    <div class="card">
-        <h2>Update Rates (for future years)</h2>
-        <textarea id="newRates" rows="10" style="font-family:monospace;">{
-  "single": [ {"threshold":0,"rate":0.0475}, {"threshold":4300,"rate":0.0675}, {"threshold":10750,"rate":0.0875}, {"threshold":125000,"rate":0.099} ],
-  "married": [ {"threshold":0,"rate":0.0475}, {"threshold":8600,"rate":0.0675}, {"threshold":21500,"rate":0.0875}, {"threshold":250000,"rate":0.099} ]
-}</textarea><br>
-        <button onclick="saveRates()">Save New Rates Locally</button>
-        <button onclick="resetRates()">Reset</button>
+    <!-- Salary -->
+    <div id="salaryFields" style="display:none;">
+      <div class="field"><label>Gross pay this week ($)</label><input type="number" id="weeklySalary" step="0.01" value="1200.00"></div>
     </div>
 
-    <script>
-        let rates = { single: [...], married: [...] }; // full brackets from PDF
+    <h2 class="section-title" style="margin-top:22px;">Pre-tax deductions this check</h2>
+    <div class="field-row">
+      <div class="field"><label>401(k) this week ($)</label><input type="number" id="preTax401k" step="0.01" value="0"></div>
+      <div class="field"><label>Health/cafeteria this week ($)</label><input type="number" id="preTaxCafeteria" step="0.01" value="0"></div>
+    </div>
 
-        function saveRates() {
-            try {
-                rates = JSON.parse(document.getElementById("newRates").value);
-                localStorage.setItem("orRates", JSON.stringify(rates));
-                alert("Saved!");
-                calculate();
-            } catch(e) { alert("Invalid JSON"); }
-        }
+    <details class="advanced">
+      <summary>Advanced — year-to-date wages (improves Social Security, Medicare &amp; Paid Leave accuracy)</summary>
+      <div class="field-row">
+        <div class="field"><label>YTD gross wages ($)</label><input type="number" id="ytdGross" step="0.01" value="0"></div>
+        <div class="field"><label>YTD Social Security wages ($)</label><input type="number" id="ytdSSWages" step="0.01" value="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>YTD qualified overtime premium ($)</label><input type="number" id="ytdOtPremium" step="0.01" value="0"></div>
+      </div>
+    </details>
 
-        function resetRates() {
-            localStorage.removeItem("orRates");
-            location.reload();
-        }
+    <button class="btn btn-primary" id="calcBtn">Calculate take-home pay</button>
+  </section>
 
-        function calculate() {
-            // Full logic with FICA, Oregon, estimated Federal, etc.
-            // (I can expand this further if you send more paystubs)
-            const gross = 2689.60; // placeholder - use inputs
-            document.getElementById("results").innerHTML = `<p class="result">Net ≈ $1,997 (close to your stub)</p>`;
-        }
+  <!-- RESULTS PANEL -->
+  <section class="panel perforated" id="panel-results">
+    <div class="result-hero">
+      <div class="label">Net take-home, this week</div>
+      <div class="amount" id="resNet">$0.00</div>
+      <div class="sub" id="resGrossLine"></div>
+    </div>
 
-        window.onload = calculate;
-    </script>
+    <div class="proj-row">
+      <div class="proj-card"><div class="k">Monthly</div><div class="v" id="resMonthly">$0</div></div>
+      <div class="proj-card"><div class="k">Annual</div><div class="v" id="resAnnual">$0</div></div>
+      <div class="proj-card"><div class="k">Effective rate</div><div class="v" id="resEffRate">0%</div></div>
+    </div>
+
+    <table class="ledger" id="ledgerTable"></table>
+
+    <div class="ladder-block">
+      <div class="ladder-title">Federal marginal bracket <span class="rate" id="fedBracketLabel">—</span></div>
+      <div class="ladder-bar" id="fedLadder"></div>
+    </div>
+    <div class="ladder-block">
+      <div class="ladder-title">Oregon marginal bracket <span class="rate" id="orBracketLabel">—</span></div>
+      <div class="ladder-bar" id="orLadder"></div>
+    </div>
+
+    <div id="compareBox"></div>
+
+    <button class="btn btn-primary" id="setDefaultBtn">Set as default weekly pay</button>
+    <button class="btn btn-secondary" id="backToCalcBtn">Edit inputs</button>
+  </section>
+
+  <!-- SETTINGS PANEL -->
+  <section class="panel" id="panel-settings">
+    <h2 class="section-title">Settings</h2>
+    <p class="section-sub">Everything that isn't "how many hours did you work this week" lives here — dependents, rates, brackets, and your own payroll deductions.</p>
+
+    <div class="settings-subtabs">
+      <button class="settings-subtab active" data-sec="household">Household</button>
+      <button class="settings-subtab" data-sec="federal">Federal</button>
+      <button class="settings-subtab" data-sec="oregon">Oregon</button>
+      <button class="settings-subtab" data-sec="fica">FICA</button>
+      <button class="settings-subtab" data-sec="deductions">Other deductions</button>
+      <button class="settings-subtab" data-sec="hours">Hours &amp; overtime</button>
+      <button class="settings-subtab" data-sec="labels">Labels</button>
+    </div>
+
+    <!-- HOUSEHOLD -->
+    <div class="settings-section active" id="sec-household">
+      <div class="settings-group">
+        <h3>Dependents</h3>
+        <div class="field-row">
+          <div class="field"><label>Kids under 17</label><input type="number" id="kidsUnder17" value="3"></div>
+          <div class="field"><label>Other dependents</label><input type="number" id="otherDependents" value="0"></div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3>Federal W-4</h3>
+        <div class="checkline">
+          <input type="checkbox" id="multipleJobsCheckbox">
+          <label for="multipleJobsCheckbox" style="text-transform:none;font-weight:500;">Step 2 checkbox is marked (multiple jobs / spouse also works) — your employer withholds using single-filer-equivalent brackets</label>
+        </div>
+        <div class="field" style="max-width:260px;">
+          <label>Step 4(b) additional deduction ($/yr)</label>
+          <input type="number" id="step4bDeduction" step="0.01" value="17200">
+        </div>
+        <p class="settings-note">This is an addition to your standard deduction (from your W-4's Deductions Worksheet — itemized deductions, etc.). Unlike a credit, it scales with your marginal rate, so it stays accurate at any income level. Calibrated from two real paystubs at different pay levels.</p>
+        <div class="checkline">
+          <input type="checkbox" id="useCreditOverride" checked>
+          <label for="useCreditOverride" style="text-transform:none;font-weight:500;">Override the computed dependent credit with the exact number from my W-4 Step 3</label>
+        </div>
+        <div class="field" style="max-width:220px;">
+          <label>W-4 Step 3 credit override ($/yr)</label>
+          <input type="number" id="creditOverrideAmount" step="0.01" value="0">
+        </div>
+        <p class="settings-note">Calibrated at $0 — your withholding is consistent with no Step 3 credit on <em>this</em> W-4 (common if your spouse claims dependents on theirs instead). If you two ever split it differently, adjust here.</p>
+      </div>
+
+      <div class="settings-group">
+        <h3>Oregon OR-W-4</h3>
+        <div class="field" style="max-width:220px;">
+          <label>Allowances claimed</label>
+          <input type="number" id="orAllowances" step="0.01" value="7.34">
+        </div>
+        <p class="settings-note">Check your pay stub or OR-W-4 for the actual whole number — this default has been fine-tuned to a decimal so the calculator's Oregon line matches a real paystub to the penny. Treat it as a calibration dial: nudge it up or down if your own check drifts.</p>
+      </div>
+    </div>
+
+    <!-- FEDERAL -->
+    <div class="settings-section" id="sec-federal">
+      <div class="settings-group">
+        <h3>Standard withholding (no Step 2 checkbox) — MFJ</h3>
+        <p class="settings-note">Standard deduction (annual)</p>
+        <div class="field" style="max-width:220px;margin-bottom:12px;"><input type="number" id="fedStdDeduction" step="1"></div>
+        <table class="bracket-editor" id="fedBracketTable">
+          <thead><tr><th>Rate %</th><th>Up to ($)</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button class="add-row-btn" data-target="fedBracketTable">+ add bracket</button>
+      </div>
+
+      <div class="settings-group">
+        <h3>Step 2 checkbox withholding (single-equivalent)</h3>
+        <p class="settings-note">Used automatically when the Step 2 checkbox is marked in Household settings. Standard deduction (annual)</p>
+        <div class="field" style="max-width:220px;margin-bottom:12px;"><input type="number" id="fedCheckboxStdDeduction" step="1"></div>
+        <table class="bracket-editor" id="fedCheckboxBracketTable">
+          <thead><tr><th>Rate %</th><th>Up to ($)</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button class="add-row-btn" data-target="fedCheckboxBracketTable">+ add bracket</button>
+      </div>
+
+      <div class="settings-group">
+        <h3>Credits</h3>
+        <div class="field-row">
+          <div class="field"><label>Child tax credit / child</label><input type="number" id="ctcAmount" step="1"></div>
+          <div class="field"><label>Other dependent credit</label><input type="number" id="odcAmount" step="1"></div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3>Overtime premium exemption (OBBBA "No Tax on Overtime")</h3>
+        <p class="settings-note">2026 federal law excludes the FLSA overtime premium — the "half" of time-and-a-half, capped annually — from federal income tax. It does not affect Oregon tax, Social Security, or Medicare. Most payroll systems apply this only at tax-filing time, not per paycheck — leave this off unless you've confirmed your employer reduces withholding for it directly.</p>
+        <div class="checkline">
+          <input type="checkbox" id="otExemptEnabled">
+          <label for="otExemptEnabled" style="text-transform:none;font-weight:500;">My employer excludes the overtime premium from federal withholding each check</label>
+        </div>
+        <div class="field" style="max-width:260px;">
+          <label>Annual cap (MFJ, $)</label>
+          <input type="number" id="otExemptAnnualCap" step="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- OREGON -->
+    <div class="settings-section" id="sec-oregon">
+      <div class="settings-group">
+        <h3>Oregon withholding formula</h3>
+        <div class="field-row">
+          <div class="field"><label>Std deduction, &lt;3 allowances ($)</label><input type="number" id="orStdLow" step="1"></div>
+          <div class="field"><label>Std deduction, 3+ allowances ($)</label><input type="number" id="orStdHigh" step="1"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Personal exemption credit / allowance</label><input type="number" id="orExemptionCredit" step="1"></div>
+          <div class="field"><label>Credit phase-out threshold, MFJ ($/yr)</label><input type="number" id="orCreditPhaseout" step="1"></div>
+        </div>
+        <div class="field" style="max-width:260px;">
+          <label>Federal tax subtraction cap ($/yr)</label>
+          <input type="number" id="orFedSubtractionCap" step="1">
+        </div>
+        <p class="settings-note">Oregon lets you subtract a share of your federal tax from wages before applying these brackets, capped at the amount above.</p>
+        <table class="bracket-editor" id="orBracketTable">
+          <thead><tr><th>Rate %</th><th>Up to ($)</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button class="add-row-btn" data-target="orBracketTable">+ add bracket</button>
+      </div>
+
+      <div class="settings-group">
+        <h3>Statewide payroll taxes</h3>
+        <div class="field-row">
+          <div class="field"><label>Statewide transit tax %</label><input type="number" id="transitRate" step="0.001"></div>
+          <div class="field"><label>Paid Leave Oregon (PFMLI) employee %</label><input type="number" id="pfmlRate" step="0.001"></div>
+        </div>
+        <div class="field" style="max-width:260px;">
+          <label>Paid Leave wage cap ($/yr)</label>
+          <input type="number" id="pfmlWageCap" step="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- FICA -->
+    <div class="settings-section" id="sec-fica">
+      <div class="settings-group">
+        <h3>Social Security &amp; Medicare</h3>
+        <div class="field-row">
+          <div class="field"><label>Social Security %</label><input type="number" id="ssRate" step="0.001"></div>
+          <div class="field"><label>SS wage base ($/yr)</label><input type="number" id="ssWageBase" step="1"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Medicare %</label><input type="number" id="medicareRate" step="0.001"></div>
+          <div class="field"><label>Additional Medicare %</label><input type="number" id="addMedicareRate" step="0.001"></div>
+        </div>
+        <div class="field" style="max-width:280px;">
+          <label>Additional Medicare threshold (MFJ, $/yr)</label>
+          <input type="number" id="addMedicareThreshold" step="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- OTHER DEDUCTIONS -->
+    <div class="settings-section" id="sec-deductions">
+      <div class="settings-group">
+        <h3>Your payroll deductions</h3>
+        <p class="settings-note">Union dues, PAC contributions, assessment funds — anything on your stub that isn't a tax. Choose whichever unit matches how it's actually calculated.</p>
+        <table class="bracket-editor" id="otherDeductionsTable">
+          <thead><tr><th>Name</th><th>Type</th><th>Amount</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button class="add-row-btn" id="addDeductionBtn">+ add deduction</button>
+      </div>
+    </div>
+
+    <!-- HOURS -->
+    <div class="settings-section" id="sec-hours">
+      <div class="settings-group">
+        <h3>Overtime multipliers</h3>
+        <div class="field-row">
+          <div class="field"><label>Time-and-a-half multiplier</label><input type="number" id="otMultiplier" step="0.05"></div>
+          <div class="field"><label>Double-time multiplier</label><input type="number" id="dtMultiplier" step="0.05"></div>
+        </div>
+      </div>
+      <div class="settings-group">
+        <h3>Daily entry thresholds</h3>
+        <p class="settings-note">Used only when you enter hours day-by-day. Hours past the first threshold count as time-and-a-half; hours past the second count as double-time.</p>
+        <div class="field-row">
+          <div class="field"><label>Time-and-a-half after (hrs/day)</label><input type="number" id="dailyOtThreshold" step="0.25"></div>
+          <div class="field"><label>Double-time after (hrs/day)</label><input type="number" id="dailyDtThreshold" step="0.25"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LABELS -->
+    <div class="settings-section" id="sec-labels">
+      <div class="settings-group">
+        <h3>Ledger row labels</h3>
+        <p class="settings-note">Set these to match your own paystub's codes exactly, so the ledger below reads the same way your stub does.</p>
+        <div class="field-row">
+          <div class="field"><label>Gross pay</label><input type="text" id="lblGross"></div>
+          <div class="field"><label>401(k)</label><input type="text" id="lblK401"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Cafeteria/health</label><input type="text" id="lblCafeteria"></div>
+          <div class="field"><label>Federal tax</label><input type="text" id="lblFed"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Oregon tax</label><input type="text" id="lblOr"></div>
+          <div class="field"><label>Social Security</label><input type="text" id="lblSs"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Medicare</label><input type="text" id="lblMedicare"></div>
+          <div class="field"><label>Additional Medicare</label><input type="text" id="lblAddMedicare"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Transit tax</label><input type="text" id="lblTransit"></div>
+          <div class="field"><label>Paid Leave (PFMLI)</label><input type="text" id="lblPfml"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Net take-home</label><input type="text" id="lblNet"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn btn-primary" id="saveSettingsBtn">Save settings</button>
+      <button class="btn btn-ghost" id="resetSettingsBtn">Reset to 2026 defaults</button>
+    </div>
+  </section>
+
+  <footer>Runs entirely in your browser. Nothing is sent anywhere — your numbers stay on this device.</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+
+const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+// ---------- 2026 DEFAULTS ----------
+const DEFAULTS = {
+  household: {
+    kidsUnder17: 3,
+    otherDependents: 0,
+    useCreditOverride: true,
+    creditOverrideAmount: 0,
+    step4bDeduction: 17200,
+    multipleJobsCheckbox: false,
+    orAllowances: 7.3417
+  },
+  fed: {
+    standardDeduction: 32200,
+    brackets: [
+      {rate:0.10, upTo:24800},{rate:0.12, upTo:100800},{rate:0.22, upTo:211400},
+      {rate:0.24, upTo:403550},{rate:0.32, upTo:512450},{rate:0.35, upTo:768700},{rate:0.37, upTo:null}
+    ],
+    ctc: 2200, odc: 500,
+    otExemptEnabled: false,
+    otExemptAnnualCap: 25000
+  },
+  fedCheckbox: {
+    standardDeduction: 16100,
+    brackets: [
+      {rate:0.10, upTo:12400},{rate:0.12, upTo:50400},{rate:0.22, upTo:105700},
+      {rate:0.24, upTo:201775},{rate:0.32, upTo:256225},{rate:0.35, upTo:640600},{rate:0.37, upTo:null}
+    ]
+  },
+  oregon: {
+    brackets: [
+      {rate:0.0475, upTo:8100},{rate:0.0675, upTo:20400},{rate:0.0875, upTo:250000},{rate:0.099, upTo:null}
+    ],
+    stdLow: 2910,
+    stdHigh: 5820,
+    exemptionCredit: 263,
+    creditPhaseout: 200000,
+    fedSubtractionCap: 8500,
+    transitRate: 0.001,
+    pfmlRate: 0.006,
+    pfmlWageCap: 184500
+  },
+  fica: { ssRate:0.062, ssWageBase:184500, medicareRate:0.0145, addMedicareRate:0.009, addMedicareThreshold:250000 },
+  labels: {
+    gross:'Gross pay', k401:'401(k) contribution', cafeteria:'Health / cafeteria',
+    fed:'FWH', or:'ORSWH', ss:'SOC', medicare:'MED', addMedicare:'MEDADD',
+    transit:'OR TRA', pfml:'OREPFL', net:'Net take-home'
+  },
+  otherDeductions: [
+    {name:'DUES', type:'perHour', amount:2.53},
+    {name:'PAC', type:'flat', amount:1.20},
+    {name:'Y TO Y', type:'flat', amount:2.00},
+    {name:'ORSDI', type:'perHour', amount:0.009}
+  ],
+  hours: { otMultiplier:1.5, dtMultiplier:2.0, dailyOtThreshold:8, dailyDtThreshold:12, weeklyOtThreshold:40 }
+};
+
+const STORAGE_SETTINGS = 'takehome.settings.v4';
+const STORAGE_DEFAULT = 'takehome.defaultPay.v4';
+const STORAGE_DAILY = 'takehome.dailyHours.v1';
+
+function loadSettings(){
+  try{
+    const raw = localStorage.getItem(STORAGE_SETTINGS);
+    if(!raw) return JSON.parse(JSON.stringify(DEFAULTS));
+    const parsed = JSON.parse(raw);
+    // shallow-merge in case new fields were added since a user's last save
+    return Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), parsed);
+  }catch(e){ return JSON.parse(JSON.stringify(DEFAULTS)); }
+}
+function saveSettingsToStorage(s){ localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(s)); }
+function loadDefaultPay(){
+  try{ const raw = localStorage.getItem(STORAGE_DEFAULT); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+function saveDefaultPay(obj){ localStorage.setItem(STORAGE_DEFAULT, JSON.stringify(obj)); }
+function clearDefaultPayStorage(){ localStorage.removeItem(STORAGE_DEFAULT); }
+function loadDailyHours(){
+  try{ const raw = localStorage.getItem(STORAGE_DAILY); return raw ? JSON.parse(raw) : [8,8,8,8,8,0,0]; }catch(e){ return [8,8,8,8,8,0,0]; }
+}
+function saveDailyHours(arr){ localStorage.setItem(STORAGE_DAILY, JSON.stringify(arr)); }
+
+let settings = loadSettings();
+let defaultPay = loadDefaultPay();
+let lastResult = null;
+
+// ---------- helpers ----------
+const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+const fmt$ = n => (n<0?'-':'') + '$' + Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
+const fmt$0 = n => (n<0?'-':'') + '$' + Math.abs(Math.round(n)).toLocaleString('en-US');
+const fmtPct = n => (n*100).toFixed(1) + '%';
+
+function progressiveTax(taxable, brackets){
+  let tax = 0, prev = 0;
+  const sorted = brackets.slice().sort((a,b)=>{
+    const av = a.upTo===null?Infinity:a.upTo, bv = b.upTo===null?Infinity:b.upTo; return av-bv;
+  });
+  for(const b of sorted){
+    const cap = (b.upTo===null || b.upTo===undefined || b.upTo==='') ? Infinity : Number(b.upTo);
+    if(taxable > prev){ const amt = Math.min(taxable, cap) - prev; tax += amt * b.rate; prev = cap; } else break;
+  }
+  return Math.max(0, tax);
+}
+function marginalRate(taxable, brackets){
+  const sorted = brackets.slice().sort((a,b)=>{
+    const av = a.upTo===null?Infinity:a.upTo, bv = b.upTo===null?Infinity:b.upTo; return av-bv;
+  });
+  for(const b of sorted){
+    const cap = (b.upTo===null || b.upTo===undefined || b.upTo==='') ? Infinity : Number(b.upTo);
+    if(taxable <= cap) return b.rate;
+  }
+  return sorted[sorted.length-1].rate;
+}
+
+// ---------- gross pay + hours from the active entry mode ----------
+function getActivePayMode(){ return document.querySelector('.seg-btn[data-pay].active').dataset.pay; }
+
+function computeGrossAndHours(){
+  const mode = getActivePayMode();
+  if(mode === 'weeklyHourly'){
+    const rate = parseFloat(document.getElementById('hourlyRate').value)||0;
+    const reg = parseFloat(document.getElementById('regHours').value)||0;
+    const ot = parseFloat(document.getElementById('otHours').value)||0;
+    const dt = parseFloat(document.getElementById('dtHours').value)||0;
+    const gross = reg*rate + ot*rate*settings.hours.otMultiplier + dt*rate*settings.hours.dtMultiplier;
+    return { gross, totalHours: reg+ot+dt, breakdown:{reg,ot,dt,rate} };
+  }
+  if(mode === 'dailyHourly'){
+    const rate = parseFloat(document.getElementById('hourlyRateDaily').value)||0;
+    let reg=0, ot=0, dt=0;
+    document.querySelectorAll('.daily-hours-input').forEach(input=>{
+      const hrs = parseFloat(input.value)||0;
+      const otT = settings.hours.dailyOtThreshold, dtT = settings.hours.dailyDtThreshold;
+      const dReg = Math.min(hrs, otT);
+      const dOt = Math.min(Math.max(0, hrs-otT), Math.max(0,dtT-otT));
+      const dDt = Math.max(0, hrs-dtT);
+      reg += dReg; ot += dOt; dt += dDt;
+    });
+    const gross = reg*rate + ot*rate*settings.hours.otMultiplier + dt*rate*settings.hours.dtMultiplier;
+    return { gross, totalHours: reg+ot+dt, breakdown:{reg,ot,dt,rate} };
+  }
+  // salary
+  const gross = parseFloat(document.getElementById('weeklySalary').value)||0;
+  return { gross, totalHours: 0, breakdown:null };
+}
+
+// ---------- core calculation ----------
+function runCalculation(){
+  const { gross: grossWeekly, totalHours, breakdown } = computeGrossAndHours();
+  const h = settings.household;
+  const k401 = parseFloat(document.getElementById('preTax401k').value)||0;
+  const cafeteria = parseFloat(document.getElementById('preTaxCafeteria').value)||0;
+  const ytdGross = parseFloat(document.getElementById('ytdGross').value)||0;
+  const ytdSSWages = parseFloat(document.getElementById('ytdSSWages').value)||0;
+  const ytdOtPremium = parseFloat(document.getElementById('ytdOtPremium').value)||0;
+
+  const incomeTaxableWeekly = Math.max(0, grossWeekly - k401 - cafeteria);
+  const ficaTaxableWeekly = Math.max(0, grossWeekly - cafeteria);
+
+  // Qualifying FLSA overtime premium (the "half" of time-and-a-half only —
+  // any CBA-only double-time add-on above 1.5x isn't FLSA-required, so it
+  // doesn't qualify under OBBBA's "No Tax on Overtime" definition).
+  let otPremiumThisCheck = 0;
+  if(breakdown){
+    otPremiumThisCheck = (breakdown.ot + breakdown.dt) * breakdown.rate * 0.5;
+  }
+  const remainingOtCap = Math.max(0, settings.fed.otExemptAnnualCap - ytdOtPremium);
+  const otExemptThisCheck = settings.fed.otExemptEnabled ? Math.min(otPremiumThisCheck, remainingOtCap) : 0;
+  const fedTaxableWeekly = Math.max(0, incomeTaxableWeekly - otExemptThisCheck);
+
+  // ----- Federal -----
+  const useCheckbox = h.multipleJobsCheckbox;
+  const fedTable = useCheckbox ? settings.fedCheckbox : settings.fed;
+  const annualFedBase = Math.max(0, fedTaxableWeekly*52 - fedTable.standardDeduction - h.step4bDeduction);
+  const fedTaxAnnualGross = progressiveTax(annualFedBase, fedTable.brackets);
+  const computedCredit = h.kidsUnder17*settings.fed.ctc + h.otherDependents*settings.fed.odc;
+  const fedCredits = h.useCreditOverride ? h.creditOverrideAmount : computedCredit;
+  const fedTaxAnnual = Math.max(0, fedTaxAnnualGross - fedCredits);
+  const fedWeekly = fedTaxAnnual/52;
+  const fedMarginal = marginalRate(annualFedBase, fedTable.brackets);
+
+  // ----- Oregon -----
+  const annualOrWages = incomeTaxableWeekly*52;
+  const fedSubtraction = Math.min(fedWeekly*52, settings.oregon.fedSubtractionCap);
+  const orStd = h.orAllowances >= 3 ? settings.oregon.stdHigh : settings.oregon.stdLow;
+  const annualOrBase = Math.max(0, annualOrWages - fedSubtraction - orStd);
+  const orTaxAnnualGross = progressiveTax(annualOrBase, settings.oregon.brackets);
+  const orCreditEligible = annualOrWages <= settings.oregon.creditPhaseout;
+  const orCredit = orCreditEligible ? h.orAllowances*settings.oregon.exemptionCredit : 0;
+  const orTaxAnnual = Math.max(0, orTaxAnnualGross - orCredit);
+  const orWeekly = orTaxAnnual/52;
+  const orMarginal = marginalRate(annualOrBase, settings.oregon.brackets);
+
+  // ----- FICA -----
+  const remainingSSBase = Math.max(0, settings.fica.ssWageBase - ytdSSWages);
+  const ssTaxableThisWeek = Math.min(ficaTaxableWeekly, remainingSSBase);
+  const ssTax = ssTaxableThisWeek*settings.fica.ssRate;
+
+  const medicareTax = ficaTaxableWeekly*settings.fica.medicareRate;
+  const cumulativeAfterThisCheck = ytdGross + ficaTaxableWeekly;
+  const overThreshold = Math.max(0, cumulativeAfterThisCheck - settings.fica.addMedicareThreshold);
+  const addMedicareTaxable = Math.min(ficaTaxableWeekly, overThreshold);
+  const addMedicareTax = addMedicareTaxable*settings.fica.addMedicareRate;
+
+  // ----- Oregon statewide payroll taxes -----
+  const transitTax = ficaTaxableWeekly * settings.oregon.transitRate;
+  const remainingPFMLBase = Math.max(0, settings.oregon.pfmlWageCap - ytdGross);
+  const pfmlTaxable = Math.min(ficaTaxableWeekly, remainingPFMLBase);
+  const pfmlTax = pfmlTaxable * settings.oregon.pfmlRate;
+
+  // ----- Other custom deductions -----
+  const otherDeductionLines = settings.otherDeductions.map(d=>{
+    let amt = 0;
+    if(d.type==='flat') amt = d.amount;
+    else if(d.type==='percent') amt = grossWeekly * (d.amount/100);
+    else if(d.type==='perHour') amt = totalHours * d.amount;
+    return { name:d.name, amount: round2(amt) };
+  });
+  const otherDeductionsTotal = otherDeductionLines.reduce((s,l)=>s+l.amount,0);
+
+  // Round each payroll line to the cent before summing — this mirrors how
+  // real payroll systems compute (each line lands on a whole cent), and
+  // avoids sub-penny floating point drift from accumulating across lines.
+  const fedWeeklyR = round2(fedWeekly), orWeeklyR = round2(orWeekly), ssTaxR = round2(ssTax),
+        medicareTaxR = round2(medicareTax), addMedicareTaxR = round2(addMedicareTax),
+        transitTaxR = round2(transitTax), pfmlTaxR = round2(pfmlTax);
+
+  const totalTax = fedWeeklyR + orWeeklyR + ssTaxR + medicareTaxR + addMedicareTaxR + transitTaxR + pfmlTaxR + otherDeductionsTotal;
+  const netWeekly = grossWeekly - k401 - cafeteria - totalTax;
+
+  return {
+    grossWeekly, k401, cafeteria, totalHours,
+    fedWeekly: fedWeeklyR, orWeekly: orWeeklyR, ssTax: ssTaxR, medicareTax: medicareTaxR,
+    addMedicareTax: addMedicareTaxR, transitTax: transitTaxR, pfmlTax: pfmlTaxR,
+    otherDeductionLines, otherDeductionsTotal, otExemptThisCheck,
+    totalTax, netWeekly,
+    annualFedBase, annualOrBase, fedMarginal, orMarginal,
+    monthly: netWeekly*52/12, annual: netWeekly*52,
+    grossAnnual: grossWeekly*52,
+    effectiveRate: grossWeekly>0 ? totalTax/grossWeekly : 0
+  };
+}
+
+// ---------- rendering ----------
+function renderLadder(elId, labelElId, taxableAnnual, brackets, marginal){
+  const el = document.getElementById(elId);
+  el.innerHTML='';
+  const sorted = brackets.slice().sort((a,b)=>{
+    const av=a.upTo===null?Infinity:a.upTo, bv=b.upTo===null?Infinity:b.upTo; return av-bv;
+  });
+  const finiteCaps = sorted.filter(b=>b.upTo!==null).map(b=>Number(b.upTo));
+  const lastFinite = finiteCaps.length ? finiteCaps[finiteCaps.length-1] : 100000;
+  const displayMax = Math.max(lastFinite*1.25, taxableAnnual*1.1, 10000);
+  let prev = 0;
+  const palette = ['#cfe4da','#a9d0bd','#7fbd9f','#4c8c74','#2f5d50','#254a40','#1b3730'];
+  sorted.forEach((b,i)=>{
+    const cap = b.upTo===null ? displayMax : Math.min(Number(b.upTo), displayMax);
+    const width = Math.max(0, cap-prev);
+    const pct = (width/displayMax)*100;
+    if(pct>0.2){
+      const seg = document.createElement('div');
+      seg.className='ladder-seg'; seg.style.width = pct+'%'; seg.style.background = palette[i%palette.length];
+      seg.title = (b.rate*100)+'%'; el.appendChild(seg);
+    }
+    prev = cap;
+  });
+  const marker = document.createElement('div');
+  marker.className='ladder-marker';
+  const markerPct = Math.min(100, Math.max(0,(taxableAnnual/displayMax)*100));
+  marker.style.left = 'calc(' + markerPct + '% - 1px)';
+  el.appendChild(marker);
+  document.getElementById(labelElId).textContent = fmtPct(marginal);
+}
+
+function renderLedgerTable(r){
+  const L = settings.labels;
+  const rows = [
+    [L.gross, r.grossWeekly, false],
+    [L.k401, -r.k401, true],
+    [L.cafeteria, -r.cafeteria, true],
+    [L.fed, -r.fedWeekly, true],
+  ];
+  if(r.otExemptThisCheck > 0.005){
+    rows.push(['&nbsp;&nbsp;↳ OT premium excluded from FWH wages', -r.otExemptThisCheck, 'info']);
+  }
+  rows.push(
+    [L.or, -r.orWeekly, true],
+    [L.ss, -r.ssTax, true],
+    [L.medicare, -r.medicareTax, true],
+  );
+  if(r.addMedicareTax > 0.005) rows.push([L.addMedicare, -r.addMedicareTax, true]);
+  rows.push([L.pfml, -r.pfmlTax, true]);
+  rows.push([L.transit, -r.transitTax, true]);
+  r.otherDeductionLines.forEach(l=>{ if(Math.abs(l.amount)>0.001) rows.push([l.name, -l.amount, true]); });
+  rows.push([L.net, r.netWeekly, false]);
+
+  const table = document.getElementById('ledgerTable');
+  table.innerHTML = rows.map(row=>{
+    const [label, amt, isDeduct] = row;
+    const isNet = label===L.net;
+    const isInfo = isDeduct === 'info';
+    const cls = isNet ? 'net' : (isInfo ? 'info-row' : (isDeduct ? 'deduct' : ''));
+    return `<tr class="${cls}"><td>${label}</td><td class="amt">${fmt$(amt)}</td></tr>`;
+  }).join('');
+}
+
+function renderCompare(r){
+  const box = document.getElementById('compareBox');
+  if(!defaultPay){ box.innerHTML=''; return; }
+  const d = defaultPay.result;
+  const deltaWeekly = r.netWeekly - d.netWeekly;
+  const deltaAnnual = r.annual - d.annual;
+  let bumpHtml = '';
+  if(r.fedMarginal !== d.fedMarginal){
+    bumpHtml += `<div class="bump-alert">Federal marginal bracket moved from ${fmtPct(d.fedMarginal)} to <strong>${fmtPct(r.fedMarginal)}</strong> this week.</div>`;
+  }
+  if(r.orMarginal !== d.orMarginal){
+    bumpHtml += `<div class="bump-alert">Oregon marginal bracket moved from ${fmtPct(d.orMarginal)} to <strong>${fmtPct(r.orMarginal)}</strong> this week.</div>`;
+  }
+  box.innerHTML = `
+    <div class="compare-box">
+      <h3>Compared to your default pay</h3>
+      <div class="compare-row"><span>Default net / week</span><span>${fmt$(d.netWeekly)}</span></div>
+      <div class="compare-row"><span>This week's net</span><span>${fmt$(r.netWeekly)}</span></div>
+      <div class="compare-row"><span>Difference / week</span><span class="delta ${deltaWeekly>=0?'up':'down'}">${deltaWeekly>=0?'+':''}${fmt$(deltaWeekly)}</span></div>
+      <div class="compare-row"><span>Difference / year</span><span class="delta ${deltaAnnual>=0?'up':'down'}">${deltaAnnual>=0?'+':''}${fmt$0(deltaAnnual)}</span></div>
+      ${bumpHtml}
+    </div>
+  `;
+}
+
+function renderResults(r){
+  document.getElementById('resNet').textContent = fmt$(r.netWeekly);
+  document.getElementById('resGrossLine').textContent = `on ${fmt$(r.grossWeekly)} gross this week`;
+  document.getElementById('resMonthly').textContent = fmt$0(r.monthly);
+  document.getElementById('resAnnual').textContent = fmt$0(r.annual);
+  document.getElementById('resEffRate').textContent = fmtPct(r.effectiveRate);
+  renderLedgerTable(r);
+  renderLadder('fedLadder','fedBracketLabel', r.annualFedBase, (settings.household.multipleJobsCheckbox?settings.fedCheckbox:settings.fed).brackets, r.fedMarginal);
+  renderLadder('orLadder','orBracketLabel', r.annualOrBase, settings.oregon.brackets, r.orMarginal);
+  renderCompare(r);
+}
+
+function renderDefaultStrip(){
+  const strip = document.getElementById('defaultStrip');
+  if(defaultPay){
+    strip.style.display='flex';
+    document.getElementById('defaultStripText').textContent =
+      `Default weekly pay: ${fmt$(defaultPay.result.netWeekly)} net (set ${new Date(defaultPay.setAt).toLocaleDateString()})`;
+  } else {
+    strip.style.display='none';
+  }
+}
+
+// ---------- daily entry rows ----------
+function renderDailyRows(){
+  const tbody = document.getElementById('dailyRows');
+  const saved = loadDailyHours();
+  tbody.innerHTML = DAY_NAMES.map((d,i)=>`
+    <tr>
+      <td>${d}</td>
+      <td><input type="number" class="daily-hours-input" step="0.25" data-day="${i}" value="${saved[i]!==undefined?saved[i]:0}"></td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('.daily-hours-input').forEach(inp=>{
+    inp.addEventListener('input', updateDailyHint);
+  });
+  updateDailyHint();
+}
+function updateDailyHint(){
+  const vals = Array.from(document.querySelectorAll('.daily-hours-input')).map(i=>parseFloat(i.value)||0);
+  saveDailyHours(vals);
+  let reg=0, ot=0, dt=0;
+  const otT = settings.hours.dailyOtThreshold, dtT = settings.hours.dailyDtThreshold;
+  vals.forEach(hrs=>{
+    reg += Math.min(hrs, otT);
+    ot += Math.min(Math.max(0, hrs-otT), Math.max(0,dtT-otT));
+    dt += Math.max(0, hrs-dtT);
+  });
+  document.getElementById('dailyBreakdownHint').textContent =
+    `${reg.toFixed(2)} regular · ${ot.toFixed(2)} time-and-a-half · ${dt.toFixed(2)} double-time`;
+}
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    if(btn.dataset.tab==='calc') document.getElementById('panel-calc').classList.add('active');
+    if(btn.dataset.tab==='settings') document.getElementById('panel-settings').classList.add('active');
+  });
+});
+document.querySelectorAll('.settings-subtab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.settings-subtab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.settings-section').forEach(s=>s.classList.remove('active'));
+    document.getElementById('sec-'+btn.dataset.sec).classList.add('active');
+  });
+});
+
+// pay mode toggle
+document.querySelectorAll('.seg-btn[data-pay]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.seg-btn[data-pay]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('weeklyHourlyFields').style.display = btn.dataset.pay==='weeklyHourly' ? 'block':'none';
+    document.getElementById('dailyHourlyFields').style.display = btn.dataset.pay==='dailyHourly' ? 'block':'none';
+    document.getElementById('salaryFields').style.display = btn.dataset.pay==='salary' ? 'block':'none';
+    if(btn.dataset.pay==='dailyHourly') renderDailyRows();
+  });
+});
+
+// calculate button
+document.getElementById('calcBtn').addEventListener('click', ()=>{
+  lastResult = runCalculation();
+  renderResults(lastResult);
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-results').classList.add('active');
+});
+document.getElementById('backToCalcBtn').addEventListener('click', ()=>{
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-calc').classList.add('active');
+  document.querySelector('.tab-btn[data-tab="calc"]').classList.add('active');
+});
+document.getElementById('setDefaultBtn').addEventListener('click', ()=>{
+  if(!lastResult) return;
+  defaultPay = { result: lastResult, setAt: Date.now() };
+  saveDefaultPay(defaultPay);
+  renderDefaultStrip();
+  renderCompare(lastResult);
+  showToast('Set as your default weekly pay');
+});
+document.getElementById('clearDefaultBtn').addEventListener('click', ()=>{
+  defaultPay = null;
+  clearDefaultPayStorage();
+  renderDefaultStrip();
+  if(lastResult) renderCompare(lastResult);
+  showToast('Default pay cleared');
+});
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ---------- settings: bracket editors ----------
+function renderBracketTable(tableId, brackets){
+  const tbody = document.querySelector('#'+tableId+' tbody');
+  tbody.innerHTML='';
+  brackets.forEach((b, idx)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="number" step="0.01" class="rate-input" value="${(b.rate*100)}"></td>
+      <td><input type="number" step="1" class="upto-input" value="${b.upTo===null?'':b.upTo}" placeholder="and above"></td>
+      <td class="row-actions"><button type="button" title="remove">✕</button></td>
+    `;
+    tr.querySelector('.row-actions button').addEventListener('click', ()=>{
+      brackets.splice(idx,1);
+      renderBracketTable(tableId, brackets);
+    });
+    tbody.appendChild(tr);
+  });
+}
+function readBracketTable(tableId){
+  const rows = document.querySelectorAll('#'+tableId+' tbody tr');
+  const result = [];
+  rows.forEach(row=>{
+    const rate = parseFloat(row.querySelector('.rate-input').value)/100;
+    const uptoRaw = row.querySelector('.upto-input').value;
+    const upTo = uptoRaw==='' ? null : Number(uptoRaw);
+    result.push({rate, upTo});
+  });
+  return result;
+}
+document.querySelectorAll('.add-row-btn[data-target]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const targetId = btn.dataset.target;
+    const brackets = targetId==='fedBracketTable' ? settings.fed.brackets
+      : targetId==='fedCheckboxBracketTable' ? settings.fedCheckbox.brackets
+      : settings.oregon.brackets;
+    brackets.push({rate:0.10, upTo:null});
+    renderBracketTable(targetId, brackets);
+  });
+});
+
+// ---------- settings: other deductions editor ----------
+function renderDeductionsTable(){
+  const tbody = document.querySelector('#otherDeductionsTable tbody');
+  tbody.innerHTML='';
+  settings.otherDeductions.forEach((d, idx)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" class="ded-name" value="${d.name}"></td>
+      <td>
+        <select class="type-select ded-type">
+          <option value="flat" ${d.type==='flat'?'selected':''}>$ flat / week</option>
+          <option value="percent" ${d.type==='percent'?'selected':''}>% of gross</option>
+          <option value="perHour" ${d.type==='perHour'?'selected':''}>$ / hour worked</option>
+        </select>
+      </td>
+      <td><input type="number" step="0.001" class="ded-amount" value="${d.amount}"></td>
+      <td class="row-actions"><button type="button" title="remove">✕</button></td>
+    `;
+    tr.querySelector('.row-actions button').addEventListener('click', ()=>{
+      settings.otherDeductions.splice(idx,1);
+      renderDeductionsTable();
+    });
+    tbody.appendChild(tr);
+  });
+}
+function readDeductionsTable(){
+  const rows = document.querySelectorAll('#otherDeductionsTable tbody tr');
+  const result = [];
+  rows.forEach(row=>{
+    const name = row.querySelector('.ded-name').value || 'Deduction';
+    const type = row.querySelector('.ded-type').value;
+    const amount = parseFloat(row.querySelector('.ded-amount').value)||0;
+    result.push({name, type, amount});
+  });
+  return result;
+}
+document.getElementById('addDeductionBtn').addEventListener('click', ()=>{
+  settings.otherDeductions.push({name:'New deduction', type:'flat', amount:0});
+  renderDeductionsTable();
+});
+
+// ---------- settings: populate + save ----------
+function populateSettingsForm(){
+  const h = settings.household;
+  document.getElementById('kidsUnder17').value = h.kidsUnder17;
+  document.getElementById('otherDependents').value = h.otherDependents;
+  document.getElementById('multipleJobsCheckbox').checked = h.multipleJobsCheckbox;
+  document.getElementById('step4bDeduction').value = h.step4bDeduction;
+  document.getElementById('useCreditOverride').checked = h.useCreditOverride;
+  document.getElementById('creditOverrideAmount').value = h.creditOverrideAmount;
+  document.getElementById('orAllowances').value = h.orAllowances;
+
+  document.getElementById('fedStdDeduction').value = settings.fed.standardDeduction;
+  document.getElementById('ctcAmount').value = settings.fed.ctc;
+  document.getElementById('otExemptEnabled').checked = settings.fed.otExemptEnabled;
+  document.getElementById('otExemptAnnualCap').value = settings.fed.otExemptAnnualCap;
+  document.getElementById('odcAmount').value = settings.fed.odc;
+  renderBracketTable('fedBracketTable', settings.fed.brackets);
+
+  document.getElementById('fedCheckboxStdDeduction').value = settings.fedCheckbox.standardDeduction;
+  renderBracketTable('fedCheckboxBracketTable', settings.fedCheckbox.brackets);
+
+  document.getElementById('orStdLow').value = settings.oregon.stdLow;
+  document.getElementById('orStdHigh').value = settings.oregon.stdHigh;
+  document.getElementById('orExemptionCredit').value = settings.oregon.exemptionCredit;
+  document.getElementById('orCreditPhaseout').value = settings.oregon.creditPhaseout;
+  document.getElementById('orFedSubtractionCap').value = settings.oregon.fedSubtractionCap;
+  renderBracketTable('orBracketTable', settings.oregon.brackets);
+  document.getElementById('transitRate').value = (settings.oregon.transitRate*100);
+  document.getElementById('pfmlRate').value = (settings.oregon.pfmlRate*100);
+  document.getElementById('pfmlWageCap').value = settings.oregon.pfmlWageCap;
+
+  document.getElementById('ssRate').value = (settings.fica.ssRate*100);
+  document.getElementById('ssWageBase').value = settings.fica.ssWageBase;
+  document.getElementById('medicareRate').value = (settings.fica.medicareRate*100);
+  document.getElementById('addMedicareRate').value = (settings.fica.addMedicareRate*100);
+  document.getElementById('addMedicareThreshold').value = settings.fica.addMedicareThreshold;
+
+  renderDeductionsTable();
+
+  document.getElementById('otMultiplier').value = settings.hours.otMultiplier;
+  document.getElementById('dtMultiplier').value = settings.hours.dtMultiplier;
+  document.getElementById('dailyOtThreshold').value = settings.hours.dailyOtThreshold;
+  document.getElementById('dailyDtThreshold').value = settings.hours.dailyDtThreshold;
+
+  document.getElementById('lblGross').value = settings.labels.gross;
+  document.getElementById('lblK401').value = settings.labels.k401;
+  document.getElementById('lblCafeteria').value = settings.labels.cafeteria;
+  document.getElementById('lblFed').value = settings.labels.fed;
+  document.getElementById('lblOr').value = settings.labels.or;
+  document.getElementById('lblSs').value = settings.labels.ss;
+  document.getElementById('lblMedicare').value = settings.labels.medicare;
+  document.getElementById('lblAddMedicare').value = settings.labels.addMedicare;
+  document.getElementById('lblTransit').value = settings.labels.transit;
+  document.getElementById('lblPfml').value = settings.labels.pfml;
+  document.getElementById('lblNet').value = settings.labels.net;
+}
+
+document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
+  const h = settings.household;
+  h.kidsUnder17 = parseInt(document.getElementById('kidsUnder17').value)||0;
+  h.otherDependents = parseInt(document.getElementById('otherDependents').value)||0;
+  h.multipleJobsCheckbox = document.getElementById('multipleJobsCheckbox').checked;
+  h.step4bDeduction = parseFloat(document.getElementById('step4bDeduction').value)||0;
+  h.useCreditOverride = document.getElementById('useCreditOverride').checked;
+  h.creditOverrideAmount = parseFloat(document.getElementById('creditOverrideAmount').value)||0;
+  h.orAllowances = parseFloat(document.getElementById('orAllowances').value)||0;
+
+  settings.fed.standardDeduction = parseFloat(document.getElementById('fedStdDeduction').value)||0;
+  settings.fed.ctc = parseFloat(document.getElementById('ctcAmount').value)||0;
+  settings.fed.otExemptEnabled = document.getElementById('otExemptEnabled').checked;
+  settings.fed.otExemptAnnualCap = parseFloat(document.getElementById('otExemptAnnualCap').value)||0;
+  settings.fed.odc = parseFloat(document.getElementById('odcAmount').value)||0;
+  settings.fed.brackets = readBracketTable('fedBracketTable');
+
+  settings.fedCheckbox.standardDeduction = parseFloat(document.getElementById('fedCheckboxStdDeduction').value)||0;
+  settings.fedCheckbox.brackets = readBracketTable('fedCheckboxBracketTable');
+
+  settings.oregon.stdLow = parseFloat(document.getElementById('orStdLow').value)||0;
+  settings.oregon.stdHigh = parseFloat(document.getElementById('orStdHigh').value)||0;
+  settings.oregon.exemptionCredit = parseFloat(document.getElementById('orExemptionCredit').value)||0;
+  settings.oregon.creditPhaseout = parseFloat(document.getElementById('orCreditPhaseout').value)||0;
+  settings.oregon.fedSubtractionCap = parseFloat(document.getElementById('orFedSubtractionCap').value)||0;
+  settings.oregon.brackets = readBracketTable('orBracketTable');
+  settings.oregon.transitRate = (parseFloat(document.getElementById('transitRate').value)||0)/100;
+  settings.oregon.pfmlRate = (parseFloat(document.getElementById('pfmlRate').value)||0)/100;
+  settings.oregon.pfmlWageCap = parseFloat(document.getElementById('pfmlWageCap').value)||0;
+
+  settings.fica.ssRate = (parseFloat(document.getElementById('ssRate').value)||0)/100;
+  settings.fica.ssWageBase = parseFloat(document.getElementById('ssWageBase').value)||0;
+  settings.fica.medicareRate = (parseFloat(document.getElementById('medicareRate').value)||0)/100;
+  settings.fica.addMedicareRate = (parseFloat(document.getElementById('addMedicareRate').value)||0)/100;
+  settings.fica.addMedicareThreshold = parseFloat(document.getElementById('addMedicareThreshold').value)||0;
+
+  settings.otherDeductions = readDeductionsTable();
+
+  settings.hours.otMultiplier = parseFloat(document.getElementById('otMultiplier').value)||1;
+  settings.hours.dtMultiplier = parseFloat(document.getElementById('dtMultiplier').value)||1;
+  settings.hours.dailyOtThreshold = parseFloat(document.getElementById('dailyOtThreshold').value)||8;
+  settings.hours.dailyDtThreshold = parseFloat(document.getElementById('dailyDtThreshold').value)||12;
+
+  settings.labels.gross = document.getElementById('lblGross').value || 'Gross pay';
+  settings.labels.k401 = document.getElementById('lblK401').value || '401(k)';
+  settings.labels.cafeteria = document.getElementById('lblCafeteria').value || 'Cafeteria';
+  settings.labels.fed = document.getElementById('lblFed').value || 'Federal tax';
+  settings.labels.or = document.getElementById('lblOr').value || 'Oregon tax';
+  settings.labels.ss = document.getElementById('lblSs').value || 'Social Security';
+  settings.labels.medicare = document.getElementById('lblMedicare').value || 'Medicare';
+  settings.labels.addMedicare = document.getElementById('lblAddMedicare').value || 'Additional Medicare';
+  settings.labels.transit = document.getElementById('lblTransit').value || 'Transit tax';
+  settings.labels.pfml = document.getElementById('lblPfml').value || 'Paid Leave';
+  settings.labels.net = document.getElementById('lblNet').value || 'Net take-home';
+
+  saveSettingsToStorage(settings);
+  showToast('Settings saved');
+});
+
+document.getElementById('resetSettingsBtn').addEventListener('click', ()=>{
+  if(!confirm('Reset all settings — household, tax rates, and custom deductions — to the built-in 2026 defaults? This cannot be undone.')) return;
+  settings = JSON.parse(JSON.stringify(DEFAULTS));
+  saveSettingsToStorage(settings);
+  populateSettingsForm();
+  showToast('Reset to 2026 defaults');
+});
+
+// ---------- init ----------
+populateSettingsForm();
+renderDefaultStrip();
+renderDailyRows();
+
+})();
+</script>
 </body>
 </html>
