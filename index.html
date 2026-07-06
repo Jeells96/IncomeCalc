@@ -847,6 +847,7 @@ function renderCompare(r){
   if(!defaultPay){ box.innerHTML=''; return; }
   const d = defaultPay.result;
   const deltaWeekly = r.netWeekly - d.netWeekly;
+  const deltaMonthly = r.monthly - d.monthly;
   const deltaAnnual = r.annual - d.annual;
   let bumpHtml = '';
   if(r.fedMarginal !== d.fedMarginal){
@@ -861,6 +862,7 @@ function renderCompare(r){
       <div class="compare-row"><span>Default net / week</span><span>${fmt$(d.netWeekly)}</span></div>
       <div class="compare-row"><span>This week's net</span><span>${fmt$(r.netWeekly)}</span></div>
       <div class="compare-row"><span>Difference / week</span><span class="delta ${deltaWeekly>=0?'up':'down'}">${deltaWeekly>=0?'+':''}${fmt$(deltaWeekly)}</span></div>
+      <div class="compare-row"><span>Difference / month</span><span class="delta ${deltaMonthly>=0?'up':'down'}">${deltaMonthly>=0?'+':''}${fmt$0(deltaMonthly)}</span></div>
       <div class="compare-row"><span>Difference / year</span><span class="delta ${deltaAnnual>=0?'up':'down'}">${deltaAnnual>=0?'+':''}${fmt$0(deltaAnnual)}</span></div>
       ${bumpHtml}
     </div>
