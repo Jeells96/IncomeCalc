@@ -196,6 +196,7 @@
 
   <div class="tabs">
     <button class="tab-btn active" data-tab="calc">Calculate</button>
+    <button class="tab-btn" data-tab="compare">Compare</button>
     <button class="tab-btn" data-tab="settings">Settings</button>
   </div>
 
@@ -297,7 +298,29 @@
     <div id="compareBox"></div>
 
     <button class="btn btn-primary" id="setDefaultBtn">Set as default weekly pay</button>
+    <div style="display:flex; gap:10px; margin-top:10px;">
+      <button class="btn btn-secondary" id="saveCompareABtn" style="margin-top:0;">Save as Compare A</button>
+      <button class="btn btn-secondary" id="saveCompareBBtn" style="margin-top:0;">Save as Compare B</button>
+    </div>
     <button class="btn btn-secondary" id="backToCalcBtn">Edit inputs</button>
+  </section>
+
+  <!-- COMPARE PANEL -->
+  <section class="panel" id="panel-compare">
+    <h2 class="section-title">Compare two calculations</h2>
+    <p class="section-sub">Save any two calculations here to see them side by side — neither has to be your default.</p>
+
+    <div id="compareEmptyState" class="section-sub" style="text-align:center; padding:24px 10px; border:1px dashed var(--paper-line); border-radius:10px;">
+      Run a calculation, then tap <strong>Save as Compare A</strong>. Run another, tap <strong>Save as Compare B</strong> — they'll show up here side by side.
+    </div>
+
+    <table class="ledger" id="compareSideTable" style="display:none;"></table>
+    <div id="compareSideBumpAlerts"></div>
+
+    <div style="display:flex; gap:10px; margin-top:6px;">
+      <button class="btn btn-ghost" id="clearCompareABtn" style="flex:1;">Clear A</button>
+      <button class="btn btn-ghost" id="clearCompareBBtn" style="flex:1;">Clear B</button>
+    </div>
   </section>
 
   <!-- SETTINGS PANEL -->
@@ -528,7 +551,7 @@
     </div>
   </section>
 
-  <footer>Runs entirely in your browser. Nothing is sent anywhere — your numbers stay on this device.</footer>
+  <footer id="footerNote">Runs entirely in your browser. Nothing is sent anywhere — your numbers stay on this device.</footer>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -597,30 +620,79 @@ const DEFAULTS = {
 const STORAGE_SETTINGS = 'takehome.settings.v4';
 const STORAGE_DEFAULT = 'takehome.defaultPay.v4';
 const STORAGE_DAILY = 'takehome.dailyHours.v1';
+const STORAGE_COMPARE = 'takehome.compareSlots.v1';
+const STORAGE_INPUTS = 'takehome.inputs.v1';
 
-function loadSettings(){
+// ---------- storage adapter ----------
+// Claude's in-app preview sandbox does not persist plain localStorage across
+// reloads, so when this page is running inside that preview (window.storage
+// present), we use Claude's real persistent key-value store instead. Once
+// this file is actually deployed (e.g. GitHub Pages), window.storage won't
+// exist, and everything transparently falls back to standard localStorage,
+// which persists normally on a real hosted page.
+let storageMode = 'none';
+function hasClaudeStorage(){ return typeof window!=='undefined' && window.storage && typeof window.storage.get==='function'; }
+
+async function storageGet(key){
+  if(hasClaudeStorage()){
+    storageMode = 'claude';
+    try{ const res = await window.storage.get(key, false); return res ? res.value : null; }
+    catch(e){ return null; } // key not saved yet — normal on first run, not a failure
+  }
+  storageMode = 'local';
+  try{ return localStorage.getItem(key); }
+  catch(e){ storageMode='none'; return null; }
+}
+async function storageSet(key, value){
+  if(hasClaudeStorage()){
+    storageMode = 'claude';
+    try{ await window.storage.set(key, value, false); return true; }
+    catch(e){ return false; }
+  }
+  storageMode = 'local';
+  try{ localStorage.setItem(key, value); return true; }
+  catch(e){ storageMode='none'; return false; }
+}
+async function storageRemove(key){
+  if(hasClaudeStorage()){
+    try{ await window.storage.delete(key, false); return true; }catch(e){ return false; }
+  }
+  try{ localStorage.removeItem(key); return true; }catch(e){ return false; }
+}
+
+async function loadSettings(){
   try{
-    const raw = localStorage.getItem(STORAGE_SETTINGS);
+    const raw = await storageGet(STORAGE_SETTINGS);
     if(!raw) return JSON.parse(JSON.stringify(DEFAULTS));
     const parsed = JSON.parse(raw);
     // shallow-merge in case new fields were added since a user's last save
     return Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), parsed);
   }catch(e){ return JSON.parse(JSON.stringify(DEFAULTS)); }
 }
-function saveSettingsToStorage(s){ localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(s)); }
-function loadDefaultPay(){
-  try{ const raw = localStorage.getItem(STORAGE_DEFAULT); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+async function saveSettingsToStorage(s){ return storageSet(STORAGE_SETTINGS, JSON.stringify(s)); }
+async function loadDefaultPay(){
+  try{ const raw = await storageGet(STORAGE_DEFAULT); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
 }
-function saveDefaultPay(obj){ localStorage.setItem(STORAGE_DEFAULT, JSON.stringify(obj)); }
-function clearDefaultPayStorage(){ localStorage.removeItem(STORAGE_DEFAULT); }
-function loadDailyHours(){
-  try{ const raw = localStorage.getItem(STORAGE_DAILY); return raw ? JSON.parse(raw) : [8,8,8,8,8,0,0]; }catch(e){ return [8,8,8,8,8,0,0]; }
+async function saveDefaultPay(obj){ return storageSet(STORAGE_DEFAULT, JSON.stringify(obj)); }
+async function clearDefaultPayStorage(){ return storageRemove(STORAGE_DEFAULT); }
+async function loadDailyHours(){
+  try{ const raw = await storageGet(STORAGE_DAILY); return raw ? JSON.parse(raw) : [8,8,8,8,8,0,0]; }catch(e){ return [8,8,8,8,8,0,0]; }
 }
-function saveDailyHours(arr){ localStorage.setItem(STORAGE_DAILY, JSON.stringify(arr)); }
+async function saveDailyHours(arr){ return storageSet(STORAGE_DAILY, JSON.stringify(arr)); }
+async function loadCompareSlots(){
+  try{ const raw = await storageGet(STORAGE_COMPARE); return raw ? JSON.parse(raw) : {A:null,B:null}; }catch(e){ return {A:null,B:null}; }
+}
+async function saveCompareSlots(obj){ return storageSet(STORAGE_COMPARE, JSON.stringify(obj)); }
+async function loadInputs(){
+  try{ const raw = await storageGet(STORAGE_INPUTS); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+async function saveInputs(obj){ return storageSet(STORAGE_INPUTS, JSON.stringify(obj)); }
 
-let settings = loadSettings();
-let defaultPay = loadDefaultPay();
+// Safe placeholders until init() below finishes loading real data
+let settings = JSON.parse(JSON.stringify(DEFAULTS));
+let defaultPay = null;
 let lastResult = null;
+let compareSlots = {A:null, B:null};
 
 // ---------- helpers ----------
 const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -652,6 +724,41 @@ function marginalRate(taxable, brackets){
 
 // ---------- gross pay + hours from the active entry mode ----------
 function getActivePayMode(){ return document.querySelector('.seg-btn[data-pay].active').dataset.pay; }
+
+function captureInputs(){
+  return {
+    payMode: getActivePayMode(),
+    hourlyRate: document.getElementById('hourlyRate').value,
+    regHours: document.getElementById('regHours').value,
+    otHours: document.getElementById('otHours').value,
+    dtHours: document.getElementById('dtHours').value,
+    hourlyRateDaily: document.getElementById('hourlyRateDaily').value,
+    weeklySalary: document.getElementById('weeklySalary').value,
+    preTax401k: document.getElementById('preTax401k').value,
+    preTaxCafeteria: document.getElementById('preTaxCafeteria').value,
+    ytdGross: document.getElementById('ytdGross').value,
+    ytdSSWages: document.getElementById('ytdSSWages').value,
+    ytdOtPremium: document.getElementById('ytdOtPremium').value
+  };
+}
+function applyInputs(saved){
+  if(!saved) return;
+  if(saved.hourlyRate!==undefined) document.getElementById('hourlyRate').value = saved.hourlyRate;
+  if(saved.regHours!==undefined) document.getElementById('regHours').value = saved.regHours;
+  if(saved.otHours!==undefined) document.getElementById('otHours').value = saved.otHours;
+  if(saved.dtHours!==undefined) document.getElementById('dtHours').value = saved.dtHours;
+  if(saved.hourlyRateDaily!==undefined) document.getElementById('hourlyRateDaily').value = saved.hourlyRateDaily;
+  if(saved.weeklySalary!==undefined) document.getElementById('weeklySalary').value = saved.weeklySalary;
+  if(saved.preTax401k!==undefined) document.getElementById('preTax401k').value = saved.preTax401k;
+  if(saved.preTaxCafeteria!==undefined) document.getElementById('preTaxCafeteria').value = saved.preTaxCafeteria;
+  if(saved.ytdGross!==undefined) document.getElementById('ytdGross').value = saved.ytdGross;
+  if(saved.ytdSSWages!==undefined) document.getElementById('ytdSSWages').value = saved.ytdSSWages;
+  if(saved.ytdOtPremium!==undefined) document.getElementById('ytdOtPremium').value = saved.ytdOtPremium;
+  if(saved.payMode){
+    const btn = document.querySelector('.seg-btn[data-pay="'+saved.payMode+'"]');
+    if(btn) btn.click();
+  }
+}
 
 function computeGrossAndHours(){
   const mode = getActivePayMode();
@@ -869,6 +976,62 @@ function renderCompare(r){
   `;
 }
 
+function renderCompareSide(){
+  const A = compareSlots.A, B = compareSlots.B;
+  const table = document.getElementById('compareSideTable');
+  const empty = document.getElementById('compareEmptyState');
+  const alertsBox = document.getElementById('compareSideBumpAlerts');
+
+  if(!A && !B){
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    alertsBox.innerHTML = '';
+    return;
+  }
+  empty.style.display = 'none';
+  table.style.display = 'table';
+
+  const L = settings.labels;
+  const labelA = (A && A.label) || 'A';
+  const labelB = (B && B.label) || 'B';
+  const showDelta = A && B;
+
+  const rows = [
+    ['Gross pay', x=>x.grossWeekly],
+    [L.fed, x=>x.fedWeekly],
+    [L.or, x=>x.orWeekly],
+    ['Net / week', x=>x.netWeekly],
+    ['Net / month', x=>x.monthly],
+    ['Net / year', x=>x.annual],
+  ];
+
+  let html = `<tr><td><strong>&nbsp;</strong></td><td class="amt"><strong>${labelA}</strong></td><td class="amt"><strong>${labelB}</strong></td>${showDelta?'<td class="amt"><strong>Δ (B−A)</strong></td>':''}</tr>`;
+  rows.forEach(([label, getter])=>{
+    const vA = A ? getter(A) : null;
+    const vB = B ? getter(B) : null;
+    const delta = (vA!==null && vB!==null) ? vB-vA : null;
+    html += `<tr><td>${label}</td><td class="amt">${vA!==null?fmt$(vA):'—'}</td><td class="amt">${vB!==null?fmt$(vB):'—'}</td>`;
+    if(showDelta){
+      html += `<td class="amt" style="color:${delta>=0?'var(--green)':'var(--red)'}">${delta>=0?'+':''}${fmt$(delta)}</td>`;
+    }
+    html += `</tr>`;
+  });
+  html += `<tr><td>Effective rate</td><td class="amt">${A?fmtPct(A.effectiveRate):'—'}</td><td class="amt">${B?fmtPct(B.effectiveRate):'—'}</td>${showDelta?'<td></td>':''}</tr>`;
+  html += `<tr><td>Fed marginal bracket</td><td class="amt">${A?fmtPct(A.fedMarginal):'—'}</td><td class="amt">${B?fmtPct(B.fedMarginal):'—'}</td>${showDelta?'<td></td>':''}</tr>`;
+  html += `<tr><td>OR marginal bracket</td><td class="amt">${A?fmtPct(A.orMarginal):'—'}</td><td class="amt">${B?fmtPct(B.orMarginal):'—'}</td>${showDelta?'<td></td>':''}</tr>`;
+  table.innerHTML = html;
+
+  alertsBox.innerHTML = '';
+  if(showDelta){
+    if(A.fedMarginal !== B.fedMarginal){
+      alertsBox.innerHTML += `<div class="bump-alert">Federal marginal bracket differs: ${fmtPct(A.fedMarginal)} (${labelA}) vs <strong>${fmtPct(B.fedMarginal)}</strong> (${labelB}).</div>`;
+    }
+    if(A.orMarginal !== B.orMarginal){
+      alertsBox.innerHTML += `<div class="bump-alert">Oregon marginal bracket differs: ${fmtPct(A.orMarginal)} (${labelA}) vs <strong>${fmtPct(B.orMarginal)}</strong> (${labelB}).</div>`;
+    }
+  }
+}
+
 function renderResults(r){
   document.getElementById('resNet').textContent = fmt$(r.netWeekly);
   document.getElementById('resGrossLine').textContent = `on ${fmt$(r.grossWeekly)} gross this week`;
@@ -893,9 +1056,9 @@ function renderDefaultStrip(){
 }
 
 // ---------- daily entry rows ----------
-function renderDailyRows(){
+async function renderDailyRows(){
   const tbody = document.getElementById('dailyRows');
-  const saved = loadDailyHours();
+  const saved = await loadDailyHours();
   tbody.innerHTML = DAY_NAMES.map((d,i)=>`
     <tr>
       <td>${d}</td>
@@ -928,6 +1091,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.classList.add('active');
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     if(btn.dataset.tab==='calc') document.getElementById('panel-calc').classList.add('active');
+    if(btn.dataset.tab==='compare'){ document.getElementById('panel-compare').classList.add('active'); renderCompareSide(); }
     if(btn.dataset.tab==='settings') document.getElementById('panel-settings').classList.add('active');
   });
 });
@@ -953,9 +1117,10 @@ document.querySelectorAll('.seg-btn[data-pay]').forEach(btn=>{
 });
 
 // calculate button
-document.getElementById('calcBtn').addEventListener('click', ()=>{
+document.getElementById('calcBtn').addEventListener('click', async ()=>{
   lastResult = runCalculation();
   renderResults(lastResult);
+  await saveInputs(captureInputs());
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-results').classList.add('active');
@@ -965,20 +1130,49 @@ document.getElementById('backToCalcBtn').addEventListener('click', ()=>{
   document.getElementById('panel-calc').classList.add('active');
   document.querySelector('.tab-btn[data-tab="calc"]').classList.add('active');
 });
-document.getElementById('setDefaultBtn').addEventListener('click', ()=>{
+document.getElementById('setDefaultBtn').addEventListener('click', async ()=>{
   if(!lastResult) return;
   defaultPay = { result: lastResult, setAt: Date.now() };
-  saveDefaultPay(defaultPay);
+  await saveDefaultPay(defaultPay);
   renderDefaultStrip();
   renderCompare(lastResult);
   showToast('Set as your default weekly pay');
 });
-document.getElementById('clearDefaultBtn').addEventListener('click', ()=>{
+document.getElementById('clearDefaultBtn').addEventListener('click', async ()=>{
   defaultPay = null;
-  clearDefaultPayStorage();
+  await clearDefaultPayStorage();
   renderDefaultStrip();
   if(lastResult) renderCompare(lastResult);
   showToast('Default pay cleared');
+});
+document.getElementById('saveCompareABtn').addEventListener('click', async ()=>{
+  if(!lastResult) return;
+  compareSlots.A = Object.assign({}, lastResult, { label: 'A · ' + new Date().toLocaleDateString() });
+  await saveCompareSlots(compareSlots);
+  showToast('Saved as Compare A');
+});
+document.getElementById('saveCompareBBtn').addEventListener('click', async ()=>{
+  if(!lastResult) return;
+  compareSlots.B = Object.assign({}, lastResult, { label: 'B · ' + new Date().toLocaleDateString() });
+  await saveCompareSlots(compareSlots);
+  showToast('Saved as Compare B');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('.tab-btn[data-tab="compare"]').classList.add('active');
+  document.getElementById('panel-compare').classList.add('active');
+  renderCompareSide();
+});
+document.getElementById('clearCompareABtn').addEventListener('click', async ()=>{
+  compareSlots.A = null;
+  await saveCompareSlots(compareSlots);
+  renderCompareSide();
+  showToast('Cleared Compare A');
+});
+document.getElementById('clearCompareBBtn').addEventListener('click', async ()=>{
+  compareSlots.B = null;
+  await saveCompareSlots(compareSlots);
+  renderCompareSide();
+  showToast('Cleared Compare B');
 });
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -1124,7 +1318,7 @@ function populateSettingsForm(){
   document.getElementById('lblNet').value = settings.labels.net;
 }
 
-document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
+document.getElementById('saveSettingsBtn').addEventListener('click', async ()=>{
   const h = settings.household;
   h.kidsUnder17 = parseInt(document.getElementById('kidsUnder17').value)||0;
   h.otherDependents = parseInt(document.getElementById('otherDependents').value)||0;
@@ -1179,22 +1373,40 @@ document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
   settings.labels.pfml = document.getElementById('lblPfml').value || 'Paid Leave';
   settings.labels.net = document.getElementById('lblNet').value || 'Net take-home';
 
-  saveSettingsToStorage(settings);
+  await saveSettingsToStorage(settings);
   showToast('Settings saved');
 });
 
-document.getElementById('resetSettingsBtn').addEventListener('click', ()=>{
+document.getElementById('resetSettingsBtn').addEventListener('click', async ()=>{
   if(!confirm('Reset all settings — household, tax rates, and custom deductions — to the built-in 2026 defaults? This cannot be undone.')) return;
   settings = JSON.parse(JSON.stringify(DEFAULTS));
-  saveSettingsToStorage(settings);
+  await saveSettingsToStorage(settings);
   populateSettingsForm();
   showToast('Reset to 2026 defaults');
 });
 
 // ---------- init ----------
-populateSettingsForm();
-renderDefaultStrip();
-renderDailyRows();
+async function init(){
+  settings = await loadSettings();
+  defaultPay = await loadDefaultPay();
+  compareSlots = await loadCompareSlots();
+  const savedInputs = await loadInputs();
+
+  populateSettingsForm();
+  renderDefaultStrip();
+  await renderDailyRows();
+  applyInputs(savedInputs);
+
+  const footer = document.getElementById('footerNote');
+  if(storageMode === 'claude'){
+    footer.textContent = "Saved via Claude's preview storage — this will switch to your browser's storage automatically once you host this file (e.g. on GitHub Pages).";
+  } else if(storageMode === 'local'){
+    footer.textContent = "Runs entirely in your browser. Nothing is sent anywhere — your numbers are saved in this browser only.";
+  } else {
+    footer.textContent = "⚠️ This browser/context isn't able to save data between visits — try opening the hosted page directly in Safari or Chrome rather than an embedded preview.";
+  }
+}
+init();
 
 })();
 </script>
