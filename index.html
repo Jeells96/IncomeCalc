@@ -139,6 +139,14 @@
   .ladder-marker::after{content:""; position:absolute; top:-5px; left:-4px; border-left:5px solid transparent; border-right:5px solid transparent; border-top:6px solid var(--ink);}
 
   .compare-box{background:var(--amber-pale); border:1px solid #e8cda3; border-radius:10px; padding:16px 16px; margin-bottom:20px;}
+  .compare-legend-row{
+    display:flex; align-items:baseline; gap:8px; font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px; padding:6px 10px; border-radius:7px; margin-bottom:6px; background:#fff; border:1px solid var(--paper-line);
+  }
+  .compare-legend-row .tag{
+    font-family:'Inter'; font-weight:700; font-size:11px; color:#fff; background:var(--green);
+    padding:2px 7px; border-radius:5px; flex-shrink:0;
+  }
   .compare-box h3{font-family:'Fraunces', serif; font-size:16px; margin:0 0 10px; color:#7a4a19;}
   .compare-row{display:flex; justify-content:space-between; font-size:13px; padding:4px 0; font-family:'IBM Plex Mono', monospace;}
   .compare-row .delta.up{color:var(--green);}
@@ -314,6 +322,7 @@
       Run a calculation, then tap <strong>Save as Compare A</strong>. Run another, tap <strong>Save as Compare B</strong> — they'll show up here side by side.
     </div>
 
+    <div id="compareLegend" style="display:none; margin-bottom:14px;"></div>
     <table class="ledger" id="compareSideTable" style="display:none;"></table>
     <div id="compareSideBumpAlerts"></div>
 
@@ -699,6 +708,20 @@ const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
 const fmt$ = n => (n<0?'-':'') + '$' + Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
 const fmt$0 = n => (n<0?'-':'') + '$' + Math.abs(Math.round(n)).toLocaleString('en-US');
 const fmtPct = n => (n*100).toFixed(1) + '%';
+const fmtHrs = n => { const r = Math.round(n*100)/100; return Number.isInteger(r) ? String(r) : r.toFixed(2); };
+
+function describePay(r){
+  if(r.payMode === 'salary' || !r.breakdown){
+    return `${fmt$(r.grossWeekly)}/wk flat`;
+  }
+  const b = r.breakdown;
+  const parts = [];
+  if(b.reg>0) parts.push(`${fmtHrs(b.reg)} reg`);
+  if(b.ot>0) parts.push(`${fmtHrs(b.ot)} OT`);
+  if(b.dt>0) parts.push(`${fmtHrs(b.dt)} DT`);
+  const hoursStr = parts.length ? parts.join(' + ') : '0 hrs';
+  return `${hoursStr} @ $${b.rate.toFixed(2)}/hr`;
+}
 
 function progressiveTax(taxable, brackets){
   let tax = 0, prev = 0;
@@ -791,6 +814,7 @@ function computeGrossAndHours(){
 
 // ---------- core calculation ----------
 function runCalculation(){
+  const payMode = getActivePayMode();
   const { gross: grossWeekly, totalHours, breakdown } = computeGrossAndHours();
   const h = settings.household;
   const k401 = parseFloat(document.getElementById('preTax401k').value)||0;
@@ -874,7 +898,7 @@ function runCalculation(){
   const netWeekly = grossWeekly - k401 - cafeteria - totalTax;
 
   return {
-    grossWeekly, k401, cafeteria, totalHours,
+    grossWeekly, k401, cafeteria, totalHours, payMode, breakdown,
     fedWeekly: fedWeeklyR, orWeekly: orWeeklyR, ssTax: ssTaxR, medicareTax: medicareTaxR,
     addMedicareTax: addMedicareTaxR, transitTax: transitTaxR, pfmlTax: pfmlTaxR,
     otherDeductionLines, otherDeductionsTotal, otExemptThisCheck,
@@ -981,20 +1005,28 @@ function renderCompareSide(){
   const table = document.getElementById('compareSideTable');
   const empty = document.getElementById('compareEmptyState');
   const alertsBox = document.getElementById('compareSideBumpAlerts');
+  const legend = document.getElementById('compareLegend');
 
   if(!A && !B){
     table.style.display = 'none';
+    legend.style.display = 'none';
     empty.style.display = 'block';
     alertsBox.innerHTML = '';
     return;
   }
   empty.style.display = 'none';
   table.style.display = 'table';
+  legend.style.display = 'block';
 
   const L = settings.labels;
-  const labelA = (A && A.label) || 'A';
-  const labelB = (B && B.label) || 'B';
+  const labelA = (A && A.label) || 'not set';
+  const labelB = (B && B.label) || 'not set';
   const showDelta = A && B;
+
+  legend.innerHTML = `
+    <div class="compare-legend-row"><span class="tag">A</span> ${labelA}</div>
+    <div class="compare-legend-row"><span class="tag" style="background:var(--ink)">B</span> ${labelB}</div>
+  `;
 
   const rows = [
     ['Gross pay', x=>x.grossWeekly],
@@ -1005,7 +1037,7 @@ function renderCompareSide(){
     ['Net / year', x=>x.annual],
   ];
 
-  let html = `<tr><td><strong>&nbsp;</strong></td><td class="amt"><strong>${labelA}</strong></td><td class="amt"><strong>${labelB}</strong></td>${showDelta?'<td class="amt"><strong>Δ (B−A)</strong></td>':''}</tr>`;
+  let html = `<tr><td><strong>&nbsp;</strong></td><td class="amt"><strong>A</strong></td><td class="amt"><strong>B</strong></td>${showDelta?'<td class="amt"><strong>Δ</strong></td>':''}</tr>`;
   rows.forEach(([label, getter])=>{
     const vA = A ? getter(A) : null;
     const vB = B ? getter(B) : null;
@@ -1024,17 +1056,19 @@ function renderCompareSide(){
   alertsBox.innerHTML = '';
   if(showDelta){
     if(A.fedMarginal !== B.fedMarginal){
-      alertsBox.innerHTML += `<div class="bump-alert">Federal marginal bracket differs: ${fmtPct(A.fedMarginal)} (${labelA}) vs <strong>${fmtPct(B.fedMarginal)}</strong> (${labelB}).</div>`;
+      alertsBox.innerHTML += `<div class="bump-alert">Federal marginal bracket differs: ${fmtPct(A.fedMarginal)} (A) vs <strong>${fmtPct(B.fedMarginal)}</strong> (B).</div>`;
     }
     if(A.orMarginal !== B.orMarginal){
-      alertsBox.innerHTML += `<div class="bump-alert">Oregon marginal bracket differs: ${fmtPct(A.orMarginal)} (${labelA}) vs <strong>${fmtPct(B.orMarginal)}</strong> (${labelB}).</div>`;
+      alertsBox.innerHTML += `<div class="bump-alert">Oregon marginal bracket differs: ${fmtPct(A.orMarginal)} (A) vs <strong>${fmtPct(B.orMarginal)}</strong> (B).</div>`;
     }
   }
 }
 
 function renderResults(r){
   document.getElementById('resNet').textContent = fmt$(r.netWeekly);
-  document.getElementById('resGrossLine').textContent = `on ${fmt$(r.grossWeekly)} gross this week`;
+  document.getElementById('resGrossLine').textContent = r.payMode==='salary'
+    ? `on ${fmt$(r.grossWeekly)} gross this week`
+    : `${describePay(r)} — ${fmt$(r.grossWeekly)} gross this week`;
   document.getElementById('resMonthly').textContent = fmt$0(r.monthly);
   document.getElementById('resAnnual').textContent = fmt$0(r.annual);
   document.getElementById('resEffRate').textContent = fmtPct(r.effectiveRate);
@@ -1147,13 +1181,13 @@ document.getElementById('clearDefaultBtn').addEventListener('click', async ()=>{
 });
 document.getElementById('saveCompareABtn').addEventListener('click', async ()=>{
   if(!lastResult) return;
-  compareSlots.A = Object.assign({}, lastResult, { label: 'A · ' + new Date().toLocaleDateString() });
+  compareSlots.A = Object.assign({}, lastResult, { label: describePay(lastResult) });
   await saveCompareSlots(compareSlots);
   showToast('Saved as Compare A');
 });
 document.getElementById('saveCompareBBtn').addEventListener('click', async ()=>{
   if(!lastResult) return;
-  compareSlots.B = Object.assign({}, lastResult, { label: 'B · ' + new Date().toLocaleDateString() });
+  compareSlots.B = Object.assign({}, lastResult, { label: describePay(lastResult) });
   await saveCompareSlots(compareSlots);
   showToast('Saved as Compare B');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
