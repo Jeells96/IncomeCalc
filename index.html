@@ -1431,13 +1431,22 @@ async function init(){
   await renderDailyRows();
   applyInputs(savedInputs);
 
+  // Real cross-reload proof, not a claim: this counter only goes up if
+  // whatever backend we used actually survived a page reload. A successful
+  // write/read on THIS load proves nothing about persistence by itself —
+  // only a second load finding what the first one wrote does.
+  const PERSIST_KEY = 'takehome.persistCheck.v1';
+  let prevCount = 0;
+  try{ const raw = await storageGet(PERSIST_KEY); prevCount = raw ? parseInt(raw, 10)||0 : 0; }catch(e){ prevCount = 0; }
+  const newCount = prevCount + 1;
+  await storageSet(PERSIST_KEY, String(newCount));
+
   const footer = document.getElementById('footerNote');
-  if(storageMode === 'claude'){
-    footer.textContent = "Saved via Claude's preview storage — this will switch to your browser's storage automatically once you host this file (e.g. on GitHub Pages).";
-  } else if(storageMode === 'local'){
-    footer.textContent = "Runs entirely in your browser. Nothing is sent anywhere — your numbers are saved in this browser only.";
+  const backendLabel = storageMode==='claude' ? "Claude's preview storage" : storageMode==='local' ? 'this browser (localStorage)' : 'no working storage found';
+  if(newCount > 1){
+    footer.textContent = `✓ Persistence confirmed via ${backendLabel} — this page has survived ${newCount} reloads so far. Refresh again any time to re-check this number.`;
   } else {
-    footer.textContent = "⚠️ This browser/context isn't able to save data between visits — try opening the hosted page directly in Safari or Chrome rather than an embedded preview.";
+    footer.textContent = `Backend in use: ${backendLabel}. Reload count: 1. Refresh the page now — if this message still says "1" instead of "2", data is NOT actually persisting here, whatever else this page claims.`;
   }
 }
 init();
