@@ -634,35 +634,50 @@ const STORAGE_COMPARE = 'takehome.compareSlots.v1';
 const STORAGE_INPUTS = 'takehome.inputs.v1';
 
 // ---------- storage ----------
-// Plain, standard localStorage — no detection layers, no alternate backends.
-// This is exactly what any normal website uses, and exactly what should
-// persist across reloads on a real hosted page. If a call fails for any
-// reason, the real browser error is captured and shown on screen (see
-// reportStorageError below) instead of failing silently, so a real problem
-// is never invisible.
+// Plain, standard localStorage. If a write/read fails, the real browser
+// error is captured and shown on screen — and everything falls back to an
+// in-memory store for the rest of THIS visit, so the app stays usable even
+// when the browser is actively blocking real persistence (see below).
 let storageErrors = [];
+let memoryFallback = {}; // used only when localStorage itself is unavailable
+let usingMemoryFallback = false;
+
+function isPrivateBrowsingSignature(err){
+  const msg = (err && err.message ? err.message : String(err)).toLowerCase();
+  return msg.includes('quota');
+}
+
 function reportStorageError(context, err){
   storageErrors.push(`${context}: ${err && err.message ? err.message : err}`);
+  usingMemoryFallback = true;
   const banner = document.getElementById('storageErrorBanner');
   if(banner){
     banner.style.display = 'block';
-    banner.textContent = '⚠️ Storage error — ' + storageErrors[storageErrors.length-1] +
-      (storageErrors.length>1 ? ` (+${storageErrors.length-1} more, see console)` : '');
+    if(isPrivateBrowsingSignature(err)){
+      banner.textContent = "⚠️ Your browser is blocking data saving — this is almost always Private/Incognito Browsing mode, which sets storage space to zero on every website as a privacy feature (not specific to this page). Everything below will still work for this visit, but nothing will be remembered if you refresh or close the tab. Open this page in a normal (non-private) tab to save data between visits.";
+    } else {
+      banner.textContent = '⚠️ Storage error — ' + storageErrors[storageErrors.length-1] +
+        (storageErrors.length>1 ? ` (+${storageErrors.length-1} more, see console)` : '') +
+        ' Everything below will still work for this visit, using temporary memory instead.';
+    }
   }
   console.error('[takehome storage]', context, err);
 }
 
 async function storageGet(key){
+  if(usingMemoryFallback) return (key in memoryFallback) ? memoryFallback[key] : null;
   try{ return localStorage.getItem(key); }
-  catch(e){ reportStorageError('read '+key, e); return null; }
+  catch(e){ reportStorageError('read '+key, e); return (key in memoryFallback) ? memoryFallback[key] : null; }
 }
 async function storageSet(key, value){
+  if(usingMemoryFallback){ memoryFallback[key] = value; return true; }
   try{ localStorage.setItem(key, value); return true; }
-  catch(e){ reportStorageError('write '+key, e); return false; }
+  catch(e){ reportStorageError('write '+key, e); memoryFallback[key] = value; return true; }
 }
 async function storageRemove(key){
+  if(usingMemoryFallback){ delete memoryFallback[key]; return true; }
   try{ localStorage.removeItem(key); return true; }
-  catch(e){ reportStorageError('delete '+key, e); return false; }
+  catch(e){ reportStorageError('delete '+key, e); delete memoryFallback[key]; return true; }
 }
 
 async function loadSettings(){
@@ -1458,7 +1473,9 @@ async function init(){
   await storageSet(PERSIST_KEY, String(newCount));
 
   const footer = document.getElementById('footerNote');
-  if(newCount > 1){
+  if(usingMemoryFallback){
+    footer.textContent = `Running on temporary memory for this visit only (see the notice above) — nothing will be remembered after you refresh or close this tab.`;
+  } else if(newCount > 1){
     footer.textContent = `✓ Persistence confirmed — this page has survived ${newCount} reloads via this browser's storage. Nothing is sent anywhere; your numbers stay on this device.`;
   } else {
     footer.textContent = `Reload count: 1. Refresh the page now — if this still says "1" instead of "2" next time, and there's no red error banner above, tell me exactly what browser and device you're using.`;
