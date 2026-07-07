@@ -195,6 +195,7 @@
 </head>
 <body>
 <div class="wrap">
+  <div id="storageErrorBanner" style="display:none; background:#a4432f; color:#fff; padding:10px 14px; border-radius:8px; font-size:12.5px; font-family:'IBM Plex Mono',monospace; margin-bottom:14px;"></div>
 
   <div class="masthead">
     <div class="eyebrow">Weekly Wage Ledger</div>
@@ -632,41 +633,36 @@ const STORAGE_DAILY = 'takehome.dailyHours.v1';
 const STORAGE_COMPARE = 'takehome.compareSlots.v1';
 const STORAGE_INPUTS = 'takehome.inputs.v1';
 
-// ---------- storage adapter ----------
-// Claude's in-app preview sandbox does not persist plain localStorage across
-// reloads, so when this page is running inside that preview (window.storage
-// present), we use Claude's real persistent key-value store instead. Once
-// this file is actually deployed (e.g. GitHub Pages), window.storage won't
-// exist, and everything transparently falls back to standard localStorage,
-// which persists normally on a real hosted page.
-let storageMode = 'none';
-function hasClaudeStorage(){ return typeof window!=='undefined' && window.storage && typeof window.storage.get==='function'; }
+// ---------- storage ----------
+// Plain, standard localStorage — no detection layers, no alternate backends.
+// This is exactly what any normal website uses, and exactly what should
+// persist across reloads on a real hosted page. If a call fails for any
+// reason, the real browser error is captured and shown on screen (see
+// reportStorageError below) instead of failing silently, so a real problem
+// is never invisible.
+let storageErrors = [];
+function reportStorageError(context, err){
+  storageErrors.push(`${context}: ${err && err.message ? err.message : err}`);
+  const banner = document.getElementById('storageErrorBanner');
+  if(banner){
+    banner.style.display = 'block';
+    banner.textContent = '⚠️ Storage error — ' + storageErrors[storageErrors.length-1] +
+      (storageErrors.length>1 ? ` (+${storageErrors.length-1} more, see console)` : '');
+  }
+  console.error('[takehome storage]', context, err);
+}
 
 async function storageGet(key){
-  if(hasClaudeStorage()){
-    storageMode = 'claude';
-    try{ const res = await window.storage.get(key, false); return res ? res.value : null; }
-    catch(e){ return null; } // key not saved yet — normal on first run, not a failure
-  }
-  storageMode = 'local';
   try{ return localStorage.getItem(key); }
-  catch(e){ storageMode='none'; return null; }
+  catch(e){ reportStorageError('read '+key, e); return null; }
 }
 async function storageSet(key, value){
-  if(hasClaudeStorage()){
-    storageMode = 'claude';
-    try{ await window.storage.set(key, value, false); return true; }
-    catch(e){ return false; }
-  }
-  storageMode = 'local';
   try{ localStorage.setItem(key, value); return true; }
-  catch(e){ storageMode='none'; return false; }
+  catch(e){ reportStorageError('write '+key, e); return false; }
 }
 async function storageRemove(key){
-  if(hasClaudeStorage()){
-    try{ await window.storage.delete(key, false); return true; }catch(e){ return false; }
-  }
-  try{ localStorage.removeItem(key); return true; }catch(e){ return false; }
+  try{ localStorage.removeItem(key); return true; }
+  catch(e){ reportStorageError('delete '+key, e); return false; }
 }
 
 async function loadSettings(){
@@ -676,24 +672,28 @@ async function loadSettings(){
     const parsed = JSON.parse(raw);
     // shallow-merge in case new fields were added since a user's last save
     return Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), parsed);
-  }catch(e){ return JSON.parse(JSON.stringify(DEFAULTS)); }
+  }catch(e){ reportStorageError('parse settings', e); return JSON.parse(JSON.stringify(DEFAULTS)); }
 }
 async function saveSettingsToStorage(s){ return storageSet(STORAGE_SETTINGS, JSON.stringify(s)); }
 async function loadDefaultPay(){
-  try{ const raw = await storageGet(STORAGE_DEFAULT); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  try{ const raw = await storageGet(STORAGE_DEFAULT); return raw ? JSON.parse(raw) : null; }
+  catch(e){ reportStorageError('parse default pay', e); return null; }
 }
 async function saveDefaultPay(obj){ return storageSet(STORAGE_DEFAULT, JSON.stringify(obj)); }
 async function clearDefaultPayStorage(){ return storageRemove(STORAGE_DEFAULT); }
 async function loadDailyHours(){
-  try{ const raw = await storageGet(STORAGE_DAILY); return raw ? JSON.parse(raw) : [8,8,8,8,8,0,0]; }catch(e){ return [8,8,8,8,8,0,0]; }
+  try{ const raw = await storageGet(STORAGE_DAILY); return raw ? JSON.parse(raw) : [8,8,8,8,8,0,0]; }
+  catch(e){ reportStorageError('parse daily hours', e); return [8,8,8,8,8,0,0]; }
 }
 async function saveDailyHours(arr){ return storageSet(STORAGE_DAILY, JSON.stringify(arr)); }
 async function loadCompareSlots(){
-  try{ const raw = await storageGet(STORAGE_COMPARE); return raw ? JSON.parse(raw) : {A:null,B:null}; }catch(e){ return {A:null,B:null}; }
+  try{ const raw = await storageGet(STORAGE_COMPARE); return raw ? JSON.parse(raw) : {A:null,B:null}; }
+  catch(e){ reportStorageError('parse compare slots', e); return {A:null,B:null}; }
 }
 async function saveCompareSlots(obj){ return storageSet(STORAGE_COMPARE, JSON.stringify(obj)); }
 async function loadInputs(){
-  try{ const raw = await storageGet(STORAGE_INPUTS); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  try{ const raw = await storageGet(STORAGE_INPUTS); return raw ? JSON.parse(raw) : null; }
+  catch(e){ reportStorageError('parse inputs', e); return null; }
 }
 async function saveInputs(obj){ return storageSet(STORAGE_INPUTS, JSON.stringify(obj)); }
 
@@ -1140,16 +1140,32 @@ document.querySelectorAll('.settings-subtab').forEach(btn=>{
 
 // pay mode toggle
 document.querySelectorAll('.seg-btn[data-pay]').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
+  btn.addEventListener('click', async ()=>{
     document.querySelectorAll('.seg-btn[data-pay]').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('weeklyHourlyFields').style.display = btn.dataset.pay==='weeklyHourly' ? 'block':'none';
     document.getElementById('dailyHourlyFields').style.display = btn.dataset.pay==='dailyHourly' ? 'block':'none';
     document.getElementById('salaryFields').style.display = btn.dataset.pay==='salary' ? 'block':'none';
     if(btn.dataset.pay==='dailyHourly') renderDailyRows();
+    await saveInputs(captureInputs());
   });
 });
 
+// ---------- autosave every calculator field the moment you leave it ----------
+// Don't rely on the Calculate button as the only save point — if you change
+// a value and navigate away or refresh without calculating, it should still
+// be there next time.
+const AUTOSAVE_FIELD_IDS = [
+  'hourlyRate','regHours','otHours','dtHours','hourlyRateDaily','weeklySalary',
+  'preTax401k','preTaxCafeteria','ytdGross','ytdSSWages','ytdOtPremium'
+];
+AUTOSAVE_FIELD_IDS.forEach(id=>{
+  const el = document.getElementById(id);
+  if(el){
+    el.addEventListener('blur', async ()=>{ await saveInputs(captureInputs()); });
+    el.addEventListener('change', async ()=>{ await saveInputs(captureInputs()); });
+  }
+});
 // calculate button
 document.getElementById('calcBtn').addEventListener('click', async ()=>{
   lastResult = runCalculation();
@@ -1442,11 +1458,10 @@ async function init(){
   await storageSet(PERSIST_KEY, String(newCount));
 
   const footer = document.getElementById('footerNote');
-  const backendLabel = storageMode==='claude' ? "Claude's preview storage" : storageMode==='local' ? 'this browser (localStorage)' : 'no working storage found';
   if(newCount > 1){
-    footer.textContent = `✓ Persistence confirmed via ${backendLabel} — this page has survived ${newCount} reloads so far. Refresh again any time to re-check this number.`;
+    footer.textContent = `✓ Persistence confirmed — this page has survived ${newCount} reloads via this browser's storage. Nothing is sent anywhere; your numbers stay on this device.`;
   } else {
-    footer.textContent = `Backend in use: ${backendLabel}. Reload count: 1. Refresh the page now — if this message still says "1" instead of "2", data is NOT actually persisting here, whatever else this page claims.`;
+    footer.textContent = `Reload count: 1. Refresh the page now — if this still says "1" instead of "2" next time, and there's no red error banner above, tell me exactly what browser and device you're using.`;
   }
 }
 init();
