@@ -199,7 +199,7 @@
   <div id="taxYearBanner" style="display:none; background:var(--amber); color:#fff; padding:10px 14px; border-radius:8px; font-size:12.5px; font-family:'IBM Plex Mono',monospace; margin-bottom:14px;"></div>
 
   <div class="masthead">
-    <div class="eyebrow">Weekly Wage Ledger · v9.1</div>
+    <div class="eyebrow">Weekly Wage Ledger · v9.2</div>
     <h1>Take-Home</h1>
     <p>Oregon · Married Filing Jointly · Tax year <span id="taxYearLabel">2026</span></p>
   </div>
@@ -652,10 +652,10 @@ const DEFAULTS = {
     transit:'OR TRA', pfml:'OREPFL', net:'Net take-home'
   },
   otherDeductions: [
-    {name:'DUES', type:'perHour', amount:2.53},
-    {name:'PAC', type:'flat', amount:1.20},
-    {name:'Y TO Y', type:'flat', amount:2.00},
-    {name:'ORSDI', type:'perHour', amount:0.009}
+    {name:'DUES', type:'perHour', amount:2.53, autoType:false},
+    {name:'PAC', type:'flat', amount:1.20, autoType:true, autoDetermined:false},
+    {name:'Y TO Y', type:'flat', amount:2.00, autoType:true, autoDetermined:false},
+    {name:'ORSDI', type:'perHour', amount:0.009, autoType:false}
   ],
   hours: { otMultiplier:1.5, dtMultiplier:2.0, dailyOtThreshold:8, dailyDtThreshold:12, weeklyOtThreshold:40 }
 };
@@ -833,6 +833,19 @@ async function loadSettings(){
     const parsed = JSON.parse(raw);
     // shallow-merge in case new fields were added since a user's last save
     const merged = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), parsed);
+    // Deductions saved before auto-typing have no autoType flag. Default to
+    // fixed-type (false), but honor the known correction that PAC and Y TO Y
+    // are not fixed — flip those to auto-detect so the app learns their real
+    // type (hourly vs %) from logged stubs.
+    if(Array.isArray(merged.otherDeductions)){
+      merged.otherDeductions.forEach(d=>{
+        if(d.autoType === undefined){
+          const n = (d.name||'').trim().toUpperCase();
+          d.autoType = (n === 'PAC' || n === 'Y TO Y');
+        }
+        if(d.autoDetermined === undefined) d.autoDetermined = false;
+      });
+    }
     // One-time migration: settings saved before the tax-data system exist
     // with no year stamp and may carry stale law numbers. Refresh the law
     // numbers from the built-in tables (personal settings untouched) and
@@ -894,6 +907,64 @@ function solveKnob(fn, target, lo, hi){
 
 function clampMove(next, from, maxMove){ return Math.min(from + maxMove, Math.max(from - maxMove, next)); }
 
+const DED_TYPE_WORD = { flat:'$ flat/wk', perHour:'$/hr worked', percent:'% of gross' };
+
+// Work out a deduction's real type from its actual amounts across weeks.
+// obs: [{h: hours, g: gross, a: actual amount}]. A single week can't reveal
+// type (one dollar amount fits flat, per-hour, and % all at once), so this
+// stays "undetermined" and just tracks the amount until hours vary. A week
+// with different hours separates flat from the two scaling types; a week
+// with overtime (gross-per-hour changes) separates per-hour from %.
+function classifyDeduction(obs){
+  const undetermined = a => ({ type:'flat', amount: round2(a), determined:false, unit:'/wk' });
+  if(!obs.length) return { type:'flat', amount:0, determined:false, unit:'/wk' };
+  const last = obs[obs.length-1];
+  const amt = obs.map(o=>o.a), hrs = obs.map(o=>o.h), grs = obs.map(o=>o.g);
+  const spread = arr => Math.max.apply(null,arr) - Math.min.apply(null,arr);
+  const mean = arr => arr.reduce((s,x)=>s+x,0)/arr.length;
+
+  const hoursVary = spread(hrs) > 0.01;
+  const allHoursPos = hrs.every(h=>h>0);
+  const allGrossPos = grs.every(g=>g>0);
+  const gph = allHoursPos ? obs.map(o=>o.g/o.h) : [];
+  const gphVary = gph.length ? (spread(gph)/mean(gph) > 0.005) : false;
+
+  // least-squares rate through the origin for a given basis, plus worst residual
+  function fit(basis){
+    let num=0, den=0;
+    for(let i=0;i<obs.length;i++){ num += obs[i].a*basis[i]; den += basis[i]*basis[i]; }
+    const rate = den>0 ? num/den : 0;
+    let maxr=0; for(let i=0;i<obs.length;i++) maxr = Math.max(maxr, Math.abs(obs[i].a - rate*basis[i]));
+    return { rate, maxr };
+  }
+  const TOL = 0.02; // per-line payroll cent-rounding stays under this
+  const fm = mean(amt);
+  const flat = { rate: fm, maxr: Math.max.apply(null, amt.map(a=>Math.abs(a-fm))) };
+  const perH = allHoursPos ? fit(hrs) : null;
+  const perG = allGrossPos ? fit(grs) : null;
+  const flatOK = flat.maxr <= TOL;
+  const hourOK = !!perH && perH.maxr <= TOL;
+  const pctOK  = !!perG && perG.maxr <= TOL;
+
+  if(!hoursVary) return undetermined(last.a); // can't tell yet — track the amount
+
+  if(!gphVary){
+    // gross moves in lockstep with hours: per-hour and % are indistinguishable.
+    if(flatOK && !hourOK) return { type:'flat', amount: round2(flat.rate), determined:true, unit:'/wk' };
+    if(hourOK) return { type:'perHour', amount: Math.round(perH.rate*10000)/10000, determined:true, unit:'/hr' };
+    if(flatOK) return { type:'flat', amount: round2(flat.rate), determined:true, unit:'/wk' };
+    return undetermined(last.a);
+  }
+
+  // overtime week in the mix — per-hour vs % now separable
+  const cands = [];
+  if(hourOK) cands.push({ type:'perHour', amount: Math.round(perH.rate*10000)/10000, resid:perH.maxr, unit:'/hr' });
+  if(pctOK)  cands.push({ type:'percent', amount: Math.round(perG.rate*100*10000)/10000, resid:perG.maxr, unit:'%' });
+  if(flatOK) cands.push({ type:'flat', amount: round2(flat.rate), resid:flat.maxr, unit:'/wk' });
+  if(cands.length){ cands.sort((a,b)=>a.resid-b.resid); const c=cands[0]; return { type:c.type, amount:c.amount, determined:true, unit:c.unit }; }
+  return undetermined(last.a);
+}
+
 function renderActualsForm(r){
   const box = document.getElementById('actualsRows');
   if(!box) return;
@@ -901,7 +972,7 @@ function renderActualsForm(r){
   let html = '';
   for(let i=0;i<defs.length;i+=2){
     const pair = defs.slice(i,i+2).map(d=>
-      '<div class="field"><label>' + d.label + ' \u00b7 $' + d.pred.toFixed(2) + ' projected</label>' +
+      '<div class="field"><label>' + d.label + (d.hint||'') + ' \u00b7 $' + d.pred.toFixed(2) + ' projected</label>' +
       '<input type="number" step="0.01" inputmode="decimal" data-ak="' + d.k + '" placeholder="matched"></div>'
     ).join('');
     html += '<div class="field-row">' + pair + '</div>';
@@ -923,7 +994,11 @@ function actualLineDefs(r){
     { k:'transit', label:L.transit, pred:r.transitTax },
     { k:'pfml', label:L.pfml, pred:r.pfmlTax }
   );
-  r.otherDeductionLines.forEach((line,i)=> defs.push({ k:'ded'+i, label:line.name, pred:line.amount, dedIndex:i }));
+  r.otherDeductionLines.forEach((line,i)=>{
+    const ded = settings.otherDeductions[i] || {};
+    const hint = ded.autoType ? (ded.autoDetermined ? ' \u00b7 ' + (DED_TYPE_WORD[ded.type]||'') : ' \u00b7 detecting type') : '';
+    defs.push({ k:'ded'+i, label:line.name, pred:line.amount, dedIndex:i, hint });
+  });
   defs.push({ k:'net', label:L.net, pred:r.netWeekly });
   return defs;
 }
@@ -1009,21 +1084,41 @@ async function learnFromActuals(){
     }
   }
 
-  // Custom deductions are exact by contract — snap the setting straight to
-  // what the stub says, in the deduction's own units.
+  // Custom deductions. Auto-typed ones (type unknown) record this week's
+  // actual — the entered value, or the projection if the line was left blank
+  // because it matched — then re-derive their type from the full history.
+  // Fixed-type ones snap their rate straight to the stub in their own units.
+  const curObs = {};
   const dedAdj = [];
-  defs.forEach(d=>{
-    if(d.dedIndex === undefined || !(d.k in entered)) return;
-    const a = entered[d.k];
-    if(Math.abs(a - d.pred) < 0.02) return;
-    const ded = settings.otherDeductions[d.dedIndex];
-    if(!ded) return;
+  settings.otherDeductions.forEach((ded, i)=>{
+    const d = defs.find(x=>x.dedIndex === i);
+    if(!d) return;
+    const actual = (d.k in entered) ? entered[d.k] : d.pred; // blank = matched = projection
+
+    if(ded.autoType){
+      curObs[ded.name] = { h: round2(r.totalHours), g: round2(r.grossWeekly), a: round2(actual) };
+      const obs = [];
+      actualsLog.forEach(e=>{ if(e.obs && e.obs[ded.name]) obs.push(e.obs[ded.name]); });
+      obs.push(curObs[ded.name]);
+      const cls = classifyDeduction(obs);
+      const changed = cls.type !== ded.type || Math.abs(cls.amount - ded.amount) > 0.00005 || cls.determined !== ded.autoDetermined;
+      if(changed){
+        dedAdj.push({ i, name: ded.name, fromType: ded.type, fromAmount: ded.amount, fromAuto: true,
+          fromDetermined: ded.autoDetermined, toType: cls.type, toAmount: cls.amount, unit: cls.unit, detected: cls.determined });
+        ded.type = cls.type; ded.amount = cls.amount; ded.autoDetermined = cls.determined;
+      }
+      return;
+    }
+
+    if(!(d.k in entered)) return;
+    if(Math.abs(actual - d.pred) < 0.02) return;
     let to = null, unit = '/wk';
-    if(ded.type === 'flat'){ to = round2(a); }
-    else if(ded.type === 'perHour'){ if(r.totalHours > 0){ to = Math.round(a/r.totalHours*10000)/10000; unit = '/hr'; } }
-    else if(ded.type === 'percent'){ if(r.grossWeekly > 0){ to = Math.round(a/r.grossWeekly*100*10000)/10000; unit = '%'; } }
+    if(ded.type === 'flat'){ to = round2(actual); }
+    else if(ded.type === 'perHour'){ if(r.totalHours > 0){ to = Math.round(actual/r.totalHours*10000)/10000; unit = '/hr'; } }
+    else if(ded.type === 'percent'){ if(r.grossWeekly > 0){ to = Math.round(actual/r.grossWeekly*100*10000)/10000; unit = '%'; } }
     if(to !== null && Math.abs(to - ded.amount) > 0.00005){
-      dedAdj.push({ i: d.dedIndex, name: ded.name, from: ded.amount, to, unit });
+      dedAdj.push({ i, name: ded.name, fromType: ded.type, fromAmount: ded.amount, fromAuto: false,
+        fromDetermined: false, toType: ded.type, toAmount: to, unit, detected: false });
       ded.amount = to;
     }
   });
@@ -1059,8 +1154,10 @@ async function learnFromActuals(){
   const entry = {
     date: new Date().toISOString().slice(0,10),
     gross: round2(r.grossWeekly),
+    hours: round2(r.totalHours),
     miss: round2(miss),
     entered: enteredKeys.length ? enteredKeys.reduce((o,k)=>{ o[k]=round2(entered[k]); return o; },{}) : null,
+    obs: Object.keys(curObs).length ? curObs : undefined,
     confirmed: (lineKeys.length + 1) - enteredKeys.length,
     adj, fixedNote: notes.join(' \u00b7 '),
     taxYear: settings.taxData ? settings.taxData.year : null
@@ -1078,7 +1175,13 @@ async function learnFromActuals(){
   const parts = [];
   if(adj.step4b) parts.push('Step 4(b) ' + adj.step4b.from.toLocaleString() + ' \u2192 ' + adj.step4b.to.toLocaleString());
   if(adj.orAllowances) parts.push('OR allowances ' + adj.orAllowances.from + ' \u2192 ' + adj.orAllowances.to);
-  if(adj.deds) adj.deds.forEach(d=> parts.push(d.name + ' ' + d.from + ' \u2192 ' + d.to + d.unit));
+  if(adj.deds) adj.deds.forEach(d=>{
+    if(d.detected && d.fromAuto && !d.fromDetermined){
+      parts.push(d.name + ' detected: ' + d.toAmount + d.unit + ' (' + DED_TYPE_WORD[d.toType] + ')');
+    } else {
+      parts.push(d.name + ' \u2192 ' + d.toAmount + d.unit);
+    }
+  });
   if(parts.length){
     showToast('Learned: ' + parts.join(' \u00b7 ') + (notes.length ? ' \u00b7 ' + notes[0] : ''));
   } else if(notes.length){
@@ -1097,7 +1200,12 @@ async function undoLastLearn(){
   if(last.adj.step4b) settings.household.step4bDeduction = last.adj.step4b.from;
   if(last.adj.orAllowances) settings.household.orAllowances = last.adj.orAllowances.from;
   if(last.adj.deds) last.adj.deds.forEach(d=>{
-    if(settings.otherDeductions[d.i]) settings.otherDeductions[d.i].amount = d.from;
+    const ded = settings.otherDeductions[d.i];
+    if(!ded || ded.name !== d.name) return;
+    if(d.fromType !== undefined) ded.type = d.fromType;
+    ded.amount = (d.fromAmount !== undefined) ? d.fromAmount : d.from;
+    if(d.fromAuto !== undefined) ded.autoType = d.fromAuto;
+    if(d.fromDetermined !== undefined) ded.autoDetermined = d.fromDetermined;
   });
   actualsLog.shift();
   await saveActuals();
@@ -1137,7 +1245,10 @@ function renderActualsHistory(){
     const learned = [];
     if(e.adj && e.adj.step4b) learned.push('4(b)\u2192' + e.adj.step4b.to.toLocaleString());
     if(e.adj && e.adj.orAllowances) learned.push('allow\u2192' + e.adj.orAllowances.to);
-    if(e.adj && e.adj.deds) e.adj.deds.forEach(d=>learned.push(d.name + '\u2192' + d.to + d.unit));
+    if(e.adj && e.adj.deds) e.adj.deds.forEach(d=>{
+      const amt = (d.toAmount !== undefined) ? d.toAmount : d.to;
+      learned.push(d.name + '\u2192' + amt + (d.unit||'') + (d.detected && d.fromAuto && !d.fromDetermined ? '\u2713' : ''));
+    });
     const note = e.fixedNote ? ' \u26a0' : '';
     const learnedTxt = learned.length ? learned.join(' \u00b7 ')
       : (Math.abs(m) < 0.005 && !e.fixedNote ? 'perfect \u2713' : 'no change');
@@ -1753,15 +1864,21 @@ function renderDeductionsTable(){
   const tbody = document.querySelector('#otherDeductionsTable tbody');
   tbody.innerHTML='';
   settings.otherDeductions.forEach((d, idx)=>{
+    const isAuto = !!d.autoType;
+    const status = isAuto
+      ? (d.autoDetermined ? 'detected: ' + (DED_TYPE_WORD[d.type]||d.type) : 'detecting type from your stubs\u2026')
+      : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input type="text" class="ded-name" value="${d.name}"></td>
       <td>
         <select class="type-select ded-type">
-          <option value="flat" ${d.type==='flat'?'selected':''}>$ flat / week</option>
-          <option value="percent" ${d.type==='percent'?'selected':''}>% of gross</option>
-          <option value="perHour" ${d.type==='perHour'?'selected':''}>$ / hour worked</option>
+          <option value="auto" ${isAuto?'selected':''}>Auto (detect)</option>
+          <option value="flat" ${!isAuto && d.type==='flat'?'selected':''}>$ flat / week</option>
+          <option value="percent" ${!isAuto && d.type==='percent'?'selected':''}>% of gross</option>
+          <option value="perHour" ${!isAuto && d.type==='perHour'?'selected':''}>$ / hour worked</option>
         </select>
+        ${status ? `<div class="settings-note" style="margin:4px 0 0;">${status}</div>` : ''}
       </td>
       <td><input type="number" step="0.001" class="ded-amount" value="${d.amount}"></td>
       <td class="row-actions"><button type="button" title="remove">✕</button></td>
@@ -1770,22 +1887,36 @@ function renderDeductionsTable(){
       settings.otherDeductions.splice(idx,1);
       renderDeductionsTable();
     });
+    tr.querySelector('.ded-type').addEventListener('change', ()=>{
+      // Persist edits already in the table, then re-render so the status line
+      // and amount reflect the newly chosen type immediately.
+      settings.otherDeductions = readDeductionsTable();
+      renderDeductionsTable();
+    });
     tbody.appendChild(tr);
   });
 }
 function readDeductionsTable(){
   const rows = document.querySelectorAll('#otherDeductionsTable tbody tr');
   const result = [];
-  rows.forEach(row=>{
+  rows.forEach((row, idx)=>{
+    const prev = settings.otherDeductions[idx] || {};
     const name = row.querySelector('.ded-name').value || 'Deduction';
-    const type = row.querySelector('.ded-type').value;
+    const sel = row.querySelector('.ded-type').value;
     const amount = parseFloat(row.querySelector('.ded-amount').value)||0;
-    result.push({name, type, amount});
+    if(sel === 'auto'){
+      // Keep the last known concrete type as the active projection type while
+      // auto-detect refines it; if we don't have one yet, seed as flat.
+      const type = (prev.type && prev.type !== undefined) ? prev.type : 'flat';
+      result.push({ name, type, amount, autoType:true, autoDetermined: prev.autoType ? !!prev.autoDetermined : false });
+    } else {
+      result.push({ name, type: sel, amount, autoType:false, autoDetermined:false });
+    }
   });
   return result;
 }
 document.getElementById('addDeductionBtn').addEventListener('click', ()=>{
-  settings.otherDeductions.push({name:'New deduction', type:'flat', amount:0});
+  settings.otherDeductions.push({name:'New deduction', type:'flat', amount:0, autoType:false, autoDetermined:false});
   renderDeductionsTable();
 });
 
