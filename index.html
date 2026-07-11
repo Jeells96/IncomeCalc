@@ -196,11 +196,12 @@
 <body>
 <div class="wrap">
   <div id="storageErrorBanner" style="display:none; background:#a4432f; color:#fff; padding:10px 14px; border-radius:8px; font-size:12.5px; font-family:'IBM Plex Mono',monospace; margin-bottom:14px;"></div>
+  <div id="taxYearBanner" style="display:none; background:var(--amber); color:#fff; padding:10px 14px; border-radius:8px; font-size:12.5px; font-family:'IBM Plex Mono',monospace; margin-bottom:14px;"></div>
 
   <div class="masthead">
-    <div class="eyebrow">Weekly Wage Ledger</div>
+    <div class="eyebrow">Weekly Wage Ledger · v9.1</div>
     <h1>Take-Home</h1>
-    <p>Oregon · Married Filing Jointly · Tax year 2026</p>
+    <p>Oregon · Married Filing Jointly · Tax year <span id="taxYearLabel">2026</span></p>
   </div>
 
   <div class="tabs">
@@ -306,6 +307,16 @@
 
     <div id="compareBox"></div>
 
+    <details class="advanced" id="actualsCard">
+      <summary>Log actual paycheck — learns from every stub</summary>
+      <p class="settings-note" style="margin-top:10px;">Every line off the stub, blank means it matched. Enter only what differs and tap Log &amp; learn — FWH/ORSWH auto-tune the calibration, custom deductions snap their rate straight to the stub, and any gap on fixed-rate lines (SOC, MED, OR TRA, OREPFL) gets diagnosed since those can't legally drift. Nothing differs? Tap it anyway to bank a perfect week on the record.</p>
+      <div id="actualsRows"></div>
+      <button class="btn btn-secondary" id="learnBtn">Log &amp; learn</button>
+      <div id="actualsAccuracy" class="settings-note" style="margin-top:12px;"></div>
+      <table class="ledger" id="actualsHistoryTable" style="display:none;"></table>
+      <button class="btn btn-ghost" id="undoLearnBtn" style="display:none; width:100%;">Undo last learn</button>
+    </details>
+
     <button class="btn btn-primary" id="setDefaultBtn">Set as default weekly pay</button>
     <div style="display:flex; gap:10px; margin-top:10px;">
       <button class="btn btn-secondary" id="saveCompareABtn" style="margin-top:0;">Save as Compare A</button>
@@ -336,7 +347,7 @@
   <!-- SETTINGS PANEL -->
   <section class="panel" id="panel-settings">
     <h2 class="section-title">Settings</h2>
-    <p class="section-sub">Everything that isn't "how many hours did you work this week" lives here — dependents, rates, brackets, and your own payroll deductions.</p>
+    <p class="section-sub">Everything that isn't "how many hours did you work this week" lives here — dependents, rates, brackets, and your own payroll deductions. Tax rates and brackets auto-refresh from tax-data.json in the repo when a newer year (or revision) is published there; your household, calibration, and custom deductions are never touched by a refresh.</p>
 
     <div class="settings-subtabs">
       <button class="settings-subtab active" data-sec="household">Household</button>
@@ -571,17 +582,19 @@
 
 const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-// ---------- 2026 DEFAULTS ----------
-const DEFAULTS = {
-  household: {
-    kidsUnder17: 3,
-    otherDependents: 0,
-    useCreditOverride: true,
-    creditOverrideAmount: 0,
-    step4bDeduction: 17200,
-    multipleJobsCheckbox: false,
-    orAllowances: 7.3417
-  },
+// ---------- TAX-LAW NUMBERS (single source of truth) ----------
+// Mirrors tax-data.json in the repo exactly. The app fetches that file on
+// every load and applies it whenever its (year, revision) is newer than
+// what's stamped in saved settings — so shipping a new year = editing one
+// JSON file, no app changes. These built-ins are the offline fallback.
+//
+// 2026 sources: IRS Rev. Proc. 2025-32 (brackets, std deduction), OBBBA
+// (CTC $2,200, OT exemption cap), SSA (wage base $184,500), Oregon DOR
+// Pub 150-206-436 rev 12-31-25 (married breakpoints $9,100/$22,800, std
+// $2,910/$5,820, credit $263, federal tax subtraction cap $8,750).
+const BUILTIN_TAX_DATA = {
+  year: 2026,
+  revision: 1,
   fed: {
     standardDeduction: 32200,
     brackets: [
@@ -589,7 +602,6 @@ const DEFAULTS = {
       {rate:0.24, upTo:403550},{rate:0.32, upTo:512450},{rate:0.35, upTo:768700},{rate:0.37, upTo:null}
     ],
     ctc: 2200, odc: 500,
-    otExemptEnabled: false,
     otExemptAnnualCap: 25000
   },
   fedCheckbox: {
@@ -601,18 +613,39 @@ const DEFAULTS = {
   },
   oregon: {
     brackets: [
-      {rate:0.0475, upTo:8100},{rate:0.0675, upTo:20400},{rate:0.0875, upTo:250000},{rate:0.099, upTo:null}
+      {rate:0.0475, upTo:9100},{rate:0.0675, upTo:22800},{rate:0.0875, upTo:250000},{rate:0.099, upTo:null}
     ],
     stdLow: 2910,
     stdHigh: 5820,
     exemptionCredit: 263,
     creditPhaseout: 200000,
-    fedSubtractionCap: 8500,
+    fedSubtractionCap: 8750,
     transitRate: 0.001,
     pfmlRate: 0.006,
     pfmlWageCap: 184500
   },
-  fica: { ssRate:0.062, ssWageBase:184500, medicareRate:0.0145, addMedicareRate:0.009, addMedicareThreshold:250000 },
+  fica: { ssRate:0.062, ssWageBase:184500, medicareRate:0.0145, addMedicareRate:0.009, addMedicareThreshold:250000 }
+};
+
+// ---------- DEFAULTS ----------
+// Tax-law sections are cloned from BUILTIN_TAX_DATA above; everything else
+// here is personal (household, calibration, labels, deductions, hours) and
+// is NEVER touched by tax-data refreshes.
+const DEFAULTS = {
+  household: {
+    kidsUnder17: 3,
+    otherDependents: 0,
+    useCreditOverride: true,
+    creditOverrideAmount: 0,
+    step4bDeduction: 17200,
+    multipleJobsCheckbox: false,
+    orAllowances: 7.3417
+  },
+  fed: Object.assign({ otExemptEnabled: false }, JSON.parse(JSON.stringify(BUILTIN_TAX_DATA.fed))),
+  fedCheckbox: JSON.parse(JSON.stringify(BUILTIN_TAX_DATA.fedCheckbox)),
+  oregon: JSON.parse(JSON.stringify(BUILTIN_TAX_DATA.oregon)),
+  fica: JSON.parse(JSON.stringify(BUILTIN_TAX_DATA.fica)),
+  taxData: { year: BUILTIN_TAX_DATA.year, revision: BUILTIN_TAX_DATA.revision },
   labels: {
     gross:'Gross pay', k401:'401(k) contribution', cafeteria:'Health / cafeteria',
     fed:'FWH', or:'ORSWH', ss:'SOC', medicare:'MED', addMedicare:'MEDADD',
@@ -632,6 +665,7 @@ const STORAGE_DEFAULT = 'takehome.defaultPay.v4';
 const STORAGE_DAILY = 'takehome.dailyHours.v1';
 const STORAGE_COMPARE = 'takehome.compareSlots.v1';
 const STORAGE_INPUTS = 'takehome.inputs.v1';
+const STORAGE_ACTUALS = 'takehome.actuals.v1';
 
 // ---------- storage ----------
 // Plain, standard localStorage. If a write/read fails, the real browser
@@ -680,16 +714,444 @@ async function storageRemove(key){
   catch(e){ reportStorageError('delete '+key, e); delete memoryFallback[key]; return true; }
 }
 
+// ---------- tax-data refresh system ----------
+// Newest valid tax data seen this session (built-in, or remote if fetched).
+// "Reset to defaults" uses this so a reset never regresses to older tables.
+let latestKnownTaxData = BUILTIN_TAX_DATA;
+
+// Overwrites ONLY tax-law numbers in `target`. Household, calibration
+// (Step 4(b), OR allowances), labels, custom deductions, hours, and the
+// otExemptEnabled preference toggle are never modified here.
+function applyTaxConstants(target, d){
+  target.fed.standardDeduction = d.fed.standardDeduction;
+  target.fed.brackets = JSON.parse(JSON.stringify(d.fed.brackets));
+  target.fed.ctc = d.fed.ctc;
+  target.fed.odc = d.fed.odc;
+  target.fed.otExemptAnnualCap = d.fed.otExemptAnnualCap;
+  target.fedCheckbox.standardDeduction = d.fedCheckbox.standardDeduction;
+  target.fedCheckbox.brackets = JSON.parse(JSON.stringify(d.fedCheckbox.brackets));
+  target.oregon.brackets = JSON.parse(JSON.stringify(d.oregon.brackets));
+  target.oregon.stdLow = d.oregon.stdLow;
+  target.oregon.stdHigh = d.oregon.stdHigh;
+  target.oregon.exemptionCredit = d.oregon.exemptionCredit;
+  target.oregon.creditPhaseout = d.oregon.creditPhaseout;
+  target.oregon.fedSubtractionCap = d.oregon.fedSubtractionCap;
+  target.oregon.transitRate = d.oregon.transitRate;
+  target.oregon.pfmlRate = d.oregon.pfmlRate;
+  target.oregon.pfmlWageCap = d.oregon.pfmlWageCap;
+  target.fica.ssRate = d.fica.ssRate;
+  target.fica.ssWageBase = d.fica.ssWageBase;
+  target.fica.medicareRate = d.fica.medicareRate;
+  target.fica.addMedicareRate = d.fica.addMedicareRate;
+  target.fica.addMedicareThreshold = d.fica.addMedicareThreshold;
+  target.taxData = { year: d.year, revision: d.revision };
+}
+
+// Strict validation before any remote numbers touch paycheck math. A
+// malformed or truncated tax-data.json must be ignored, never applied.
+function isFiniteNum(x){ return typeof x === 'number' && isFinite(x); }
+function validBrackets(b){
+  if(!Array.isArray(b) || b.length === 0) return false;
+  const shapeOk = b.every(r => r && isFiniteNum(r.rate) && r.rate >= 0 && r.rate < 1 &&
+    (r.upTo === null || (isFiniteNum(r.upTo) && r.upTo > 0)));
+  const hasTop = b.some(r => r.upTo === null);
+  return shapeOk && hasTop;
+}
+function validateTaxData(d){
+  try{
+    if(!d || !isFiniteNum(d.year) || d.year < 2026 || d.year > 2100) return false;
+    if(!isFiniteNum(d.revision) || d.revision < 1) return false;
+    const f = d.fed, fc = d.fedCheckbox, o = d.oregon, fi = d.fica;
+    if(!f || !fc || !o || !fi) return false;
+    if(!isFiniteNum(f.standardDeduction) || !validBrackets(f.brackets) ||
+       !isFiniteNum(f.ctc) || !isFiniteNum(f.odc) || !isFiniteNum(f.otExemptAnnualCap)) return false;
+    if(!isFiniteNum(fc.standardDeduction) || !validBrackets(fc.brackets)) return false;
+    if(!validBrackets(o.brackets) || !isFiniteNum(o.stdLow) || !isFiniteNum(o.stdHigh) ||
+       !isFiniteNum(o.exemptionCredit) || !isFiniteNum(o.creditPhaseout) ||
+       !isFiniteNum(o.fedSubtractionCap) || !isFiniteNum(o.transitRate) ||
+       !isFiniteNum(o.pfmlRate) || !isFiniteNum(o.pfmlWageCap)) return false;
+    if(!isFiniteNum(fi.ssRate) || !isFiniteNum(fi.ssWageBase) || !isFiniteNum(fi.medicareRate) ||
+       !isFiniteNum(fi.addMedicareRate) || !isFiniteNum(fi.addMedicareThreshold)) return false;
+    return true;
+  }catch(e){ return false; }
+}
+
+function taxDataIsNewer(d, current){
+  if(!current || !isFiniteNum(current.year)) return true;
+  if(d.year !== current.year) return d.year > current.year;
+  return d.revision > (isFiniteNum(current.revision) ? current.revision : 0);
+}
+
+// January nag: if the loaded tables are for a past year, say so loudly.
+// Also keeps the masthead year and reset-button label in sync.
+function updateTaxYearUI(){
+  const td = settings.taxData || { year: BUILTIN_TAX_DATA.year };
+  document.getElementById('taxYearLabel').textContent = td.year;
+  document.getElementById('resetSettingsBtn').textContent = 'Reset to ' + latestKnownTaxData.year + ' defaults';
+  const nowYear = new Date().getFullYear();
+  const banner = document.getElementById('taxYearBanner');
+  if(nowYear > td.year){
+    banner.style.display = 'block';
+    banner.textContent = '⚠️ These tax tables are for ' + td.year + ' but it\u2019s now ' + nowYear +
+      ' \u2014 withholding math is stale. Update tax-data.json in the GitHub repo with the new year\u2019s numbers ' +
+      '(IRS Pub 15-T and Oregon Pub 150-206-436, both published each December).';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// Fetches tax-data.json from the repo (same directory as this page) and
+// applies it if newer than what's stamped in saved settings. Silent no-op
+// when offline, opened as a local file, or the JSON is missing/invalid —
+// the built-in tables keep working.
+async function checkRemoteTaxData(){
+  let remote = null;
+  try{
+    const res = await fetch('tax-data.json?ts=' + Date.now(), { cache: 'no-store' });
+    if(!res.ok) return;
+    remote = await res.json();
+  }catch(e){ return; }
+  if(!validateTaxData(remote)){
+    console.warn('[takehome] tax-data.json failed validation \u2014 ignored, using current tables');
+    return;
+  }
+  if(taxDataIsNewer(remote, latestKnownTaxData)) latestKnownTaxData = remote;
+  if(taxDataIsNewer(remote, settings.taxData)){
+    applyTaxConstants(settings, remote);
+    await saveSettingsToStorage(settings);
+    populateSettingsForm();
+    if(lastResult){ lastResult = runCalculation(); renderResults(lastResult); }
+    showToast('Tax tables updated to ' + remote.year + ' (rev ' + remote.revision + ')');
+  }
+  updateTaxYearUI();
+}
+
 async function loadSettings(){
   try{
     const raw = await storageGet(STORAGE_SETTINGS);
     if(!raw) return JSON.parse(JSON.stringify(DEFAULTS));
     const parsed = JSON.parse(raw);
     // shallow-merge in case new fields were added since a user's last save
-    return Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), parsed);
+    const merged = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), parsed);
+    // One-time migration: settings saved before the tax-data system exist
+    // with no year stamp and may carry stale law numbers. Refresh the law
+    // numbers from the built-in tables (personal settings untouched) and
+    // stamp them, so future refreshes compare against a real year.
+    if(!parsed.taxData){
+      applyTaxConstants(merged, BUILTIN_TAX_DATA);
+      await saveSettingsToStorage(merged);
+    }
+    return merged;
   }catch(e){ reportStorageError('parse settings', e); return JSON.parse(JSON.stringify(DEFAULTS)); }
 }
 async function saveSettingsToStorage(s){ return storageSet(STORAGE_SETTINGS, JSON.stringify(s)); }
+
+// ---------- paystub learning engine ----------
+// Ground truth is the actual stub, not the IRS PDF. Every logged stub
+// auto-tunes the two calibration knobs the model has: Step 4(b) for the
+// federal line, OR allowances for the Oregon line. Tables can drift, the
+// employer's payroll can round however it wants — the knobs absorb it.
+let actualsLog = [];
+async function loadActuals(){
+  try{ const raw = await storageGet(STORAGE_ACTUALS); return raw ? JSON.parse(raw) : []; }
+  catch(e){ reportStorageError('parse actuals', e); return []; }
+}
+async function saveActuals(){ return storageSet(STORAGE_ACTUALS, JSON.stringify(actualsLog)); }
+
+const LEARN_BLEND = 0.6;        // move 60% toward the exact solution per stub — converges in 2–3, resists one-off noise
+const LEARN_DEADBAND = 0.25;    // $/week; under this is payroll rounding, not signal
+const MAX_STEP4B_MOVE = 5000;   // per-entry caps so a typo'd actual can't nuke calibration
+const MAX_ALLOW_MOVE = 2.0;
+
+// Pure predictors — same math as runCalculation, but with the knob as an
+// argument so the solver can probe it. ctx comes from the calc being graded.
+function fedWeeklyFor(step4b, ctx){
+  const h = settings.household;
+  const table = h.multipleJobsCheckbox ? settings.fedCheckbox : settings.fed;
+  const base = Math.max(0, ctx.fedTaxableWeekly*52 - table.standardDeduction - step4b);
+  const gross = progressiveTax(base, table.brackets);
+  const computed = h.kidsUnder17*settings.fed.ctc + h.otherDependents*settings.fed.odc;
+  const credits = h.useCreditOverride ? h.creditOverrideAmount : computed;
+  return Math.max(0, gross - credits)/52;
+}
+function orWeeklyFor(allowances, fedWeeklyVal, ctx){
+  const annualOrWages = ctx.incomeTaxableWeekly*52;
+  const fedSub = Math.min(fedWeeklyVal*52, settings.oregon.fedSubtractionCap);
+  const std = allowances >= 3 ? settings.oregon.stdHigh : settings.oregon.stdLow;
+  const base = Math.max(0, annualOrWages - fedSub - std);
+  const grossT = progressiveTax(base, settings.oregon.brackets);
+  const credit = annualOrWages <= settings.oregon.creditPhaseout ? allowances*settings.oregon.exemptionCredit : 0;
+  return Math.max(0, grossT - credit)/52;
+}
+
+// fn must be monotone-decreasing in the knob. Finds knob where fn(knob)=target.
+function solveKnob(fn, target, lo, hi){
+  if(fn(lo) < target) return { value: lo, clamped: true };
+  if(fn(hi) > target) return { value: hi, clamped: true };
+  for(let i=0;i<60;i++){ const mid=(lo+hi)/2; if(fn(mid) > target) lo=mid; else hi=mid; }
+  return { value:(lo+hi)/2, clamped: false };
+}
+
+function clampMove(next, from, maxMove){ return Math.min(from + maxMove, Math.max(from - maxMove, next)); }
+
+function renderActualsForm(r){
+  const box = document.getElementById('actualsRows');
+  if(!box) return;
+  const defs = actualLineDefs(r);
+  let html = '';
+  for(let i=0;i<defs.length;i+=2){
+    const pair = defs.slice(i,i+2).map(d=>
+      '<div class="field"><label>' + d.label + ' \u00b7 $' + d.pred.toFixed(2) + ' projected</label>' +
+      '<input type="number" step="0.01" inputmode="decimal" data-ak="' + d.k + '" placeholder="matched"></div>'
+    ).join('');
+    html += '<div class="field-row">' + pair + '</div>';
+  }
+  box.innerHTML = html;
+}
+
+function actualLineDefs(r){
+  const L = settings.labels;
+  const defs = [
+    { k:'gross', label:L.gross, pred:r.grossWeekly },
+    { k:'fed', label:L.fed, pred:r.fedWeekly },
+    { k:'ss', label:L.ss, pred:r.ssTax },
+    { k:'medicare', label:L.medicare, pred:r.medicareTax }
+  ];
+  if(r.addMedicareTax > 0.005) defs.push({ k:'addMedicare', label:L.addMedicare, pred:r.addMedicareTax });
+  defs.push(
+    { k:'or', label:L.or, pred:r.orWeekly },
+    { k:'transit', label:L.transit, pred:r.transitTax },
+    { k:'pfml', label:L.pfml, pred:r.pfmlTax }
+  );
+  r.otherDeductionLines.forEach((line,i)=> defs.push({ k:'ded'+i, label:line.name, pred:line.amount, dedIndex:i }));
+  defs.push({ k:'net', label:L.net, pred:r.netWeekly });
+  return defs;
+}
+
+async function learnFromActuals(){
+  if(!lastResult){ showToast('Run a calculation for that week first, then log the stub'); return; }
+  const r = lastResult;
+  const defs = actualLineDefs(r);
+  const predMap = {}; defs.forEach(d=>{ predMap[d.k] = d.pred; });
+  const labelOf = k => (defs.find(d=>d.k===k)||{label:k}).label;
+
+  const entered = {};
+  let badKey = null;
+  document.querySelectorAll('#actualsRows input[data-ak]').forEach(inp=>{
+    if(inp.value === '') return;               // blank = matched the stub
+    const n = parseFloat(inp.value);
+    if(!isFinite(n) || n < 0){ badKey = inp.dataset.ak; return; }
+    entered[inp.dataset.ak] = n;
+  });
+  if(badKey){ showToast('That ' + labelOf(badKey) + ' entry isn\u2019t a valid amount'); return; }
+
+  // Gross is a guard, not a learnable line: if the stub's gross doesn't match
+  // this calc, the whole comparison is apples to oranges.
+  if('gross' in entered && Math.abs(entered.gross - r.grossWeekly) > 0.25){
+    showToast('Stub gross is ' + fmt$(entered.gross) + ' but this calc used ' + fmt$(r.grossWeekly) +
+      ' \u2014 fix hours/rate, recalculate, then log');
+    return;
+  }
+
+  const lineKeys = defs.filter(d=>d.k!=='gross' && d.k!=='net').map(d=>d.k);
+
+  // Sanity gate: an entered line wildly off the projection is a typo or a
+  // stub with retro pay / a correction — refuse to learn from it.
+  for(const k of lineKeys){
+    if(!(k in entered)) continue;
+    const tol = Math.max(40, predMap[k]*0.75);
+    if(Math.abs(entered[k] - predMap[k]) > tol){
+      showToast('That ' + labelOf(k) + ' is way off the projection \u2014 double-check it (retro pay or a correction on the stub? Skip logging that one)');
+      return;
+    }
+  }
+
+  // Blank = matched, so the stub's net must equal projected net minus the
+  // sum of entered-line misses. If it doesn't, some blank line isn't
+  // actually a match — refuse to learn from contradictory ground truth.
+  let deltaSum = 0;
+  lineKeys.forEach(k=>{ deltaSum += ((k in entered) ? entered[k] : predMap[k]) - predMap[k]; });
+  const impliedNet = r.netWeekly - deltaSum;
+  if('net' in entered && Math.abs(entered.net - impliedNet) > 0.05){
+    const gap = Math.abs(entered.net - impliedNet);
+    showToast('Net doesn\u2019t reconcile: entered lines put net at ' + fmt$(impliedNet) + ' but the stub says ' +
+      fmt$(entered.net) + ' \u2014 a blank line must differ by $' + gap.toFixed(2) + '. Find it on the stub, then log');
+    return;
+  }
+
+  const ctx = {
+    incomeTaxableWeekly: Math.max(0, r.grossWeekly - r.k401 - r.cafeteria),
+    fedTaxableWeekly: Math.max(0, r.grossWeekly - r.k401 - r.cafeteria - (r.otExemptThisCheck||0))
+  };
+  const h = settings.household;
+  const adj = {};
+
+  if('fed' in entered && Math.abs(entered.fed - r.fedWeekly) >= LEARN_DEADBAND){
+    const solved = solveKnob(x => fedWeeklyFor(x, ctx), entered.fed, 0, 200000);
+    let next = h.step4bDeduction + LEARN_BLEND*(solved.value - h.step4bDeduction);
+    next = Math.round(clampMove(next, h.step4bDeduction, MAX_STEP4B_MOVE));
+    if(next !== h.step4bDeduction){
+      adj.step4b = { from: h.step4bDeduction, to: next, clamped: solved.clamped };
+      h.step4bDeduction = next;
+    }
+  }
+
+  // Oregon depends on the federal line via the subtraction — learn it
+  // against the post-adjustment federal prediction.
+  const fedNow = fedWeeklyFor(h.step4bDeduction, ctx);
+  if('or' in entered && Math.abs(entered.or - orWeeklyFor(h.orAllowances, fedNow, ctx)) >= LEARN_DEADBAND){
+    const solved = solveKnob(a => orWeeklyFor(a, fedNow, ctx), entered.or, 0, 30);
+    let next = h.orAllowances + LEARN_BLEND*(solved.value - h.orAllowances);
+    next = Math.round(clampMove(next, h.orAllowances, MAX_ALLOW_MOVE)*10000)/10000;
+    if(Math.abs(next - h.orAllowances) > 0.00005){
+      adj.orAllowances = { from: h.orAllowances, to: next, clamped: solved.clamped };
+      h.orAllowances = next;
+    }
+  }
+
+  // Custom deductions are exact by contract — snap the setting straight to
+  // what the stub says, in the deduction's own units.
+  const dedAdj = [];
+  defs.forEach(d=>{
+    if(d.dedIndex === undefined || !(d.k in entered)) return;
+    const a = entered[d.k];
+    if(Math.abs(a - d.pred) < 0.02) return;
+    const ded = settings.otherDeductions[d.dedIndex];
+    if(!ded) return;
+    let to = null, unit = '/wk';
+    if(ded.type === 'flat'){ to = round2(a); }
+    else if(ded.type === 'perHour'){ if(r.totalHours > 0){ to = Math.round(a/r.totalHours*10000)/10000; unit = '/hr'; } }
+    else if(ded.type === 'percent'){ if(r.grossWeekly > 0){ to = Math.round(a/r.grossWeekly*100*10000)/10000; unit = '%'; } }
+    if(to !== null && Math.abs(to - ded.amount) > 0.00005){
+      dedAdj.push({ i: d.dedIndex, name: ded.name, from: ded.amount, to, unit });
+      ded.amount = to;
+    }
+  });
+  if(dedAdj.length) adj.deds = dedAdj;
+
+  // Fixed statutory lines can't be tuned — a real gap there means a config
+  // problem (pretax amounts, YTD caps) or the state moved a rate. Diagnose,
+  // don't guess.
+  const notes = [];
+  function diagFixed(k, rate, what){
+    if(!(k in entered)) return;
+    const gap = entered[k] - predMap[k];
+    if(Math.abs(gap) < 0.05) return;
+    notes.push(labelOf(k) + ' off ' + (gap>0?'+':'\u2212') + '$' + Math.abs(gap).toFixed(2) +
+      ' \u2192 ' + what + ' differ by ~' + fmt$(Math.abs(gap/rate)) + '/wk (check pretax amounts or YTD)');
+  }
+  diagFixed('ss', settings.fica.ssRate, 'SS wages');
+  diagFixed('medicare', settings.fica.medicareRate, 'Medicare wages');
+  diagFixed('addMedicare', settings.fica.addMedicareRate, 'Addl-Medicare wages');
+  diagFixed('transit', settings.oregon.transitRate, 'transit wages');
+  if('pfml' in entered){
+    const gap = entered.pfml - predMap.pfml;
+    if(Math.abs(gap) >= 0.05){
+      const base = Math.max(0.01, r.grossWeekly - r.cafeteria);
+      notes.push(labelOf('pfml') + ' off ' + (gap>0?'+':'\u2212') + '$' + Math.abs(gap).toFixed(2) +
+        ' \u2192 implied rate ' + (entered.pfml/base*100).toFixed(2) + '% vs ' + (settings.oregon.pfmlRate*100).toFixed(2) +
+        '% (pretax mismatch, wage-cap timing, or the state moved the rate)');
+    }
+  }
+
+  const miss = ('net' in entered ? entered.net : impliedNet) - r.netWeekly;
+  const enteredKeys = Object.keys(entered).filter(k=>k!=='gross');
+  const entry = {
+    date: new Date().toISOString().slice(0,10),
+    gross: round2(r.grossWeekly),
+    miss: round2(miss),
+    entered: enteredKeys.length ? enteredKeys.reduce((o,k)=>{ o[k]=round2(entered[k]); return o; },{}) : null,
+    confirmed: (lineKeys.length + 1) - enteredKeys.length,
+    adj, fixedNote: notes.join(' \u00b7 '),
+    taxYear: settings.taxData ? settings.taxData.year : null
+  };
+  actualsLog.unshift(entry);
+  actualsLog = actualsLog.slice(0, 26);
+
+  await saveActuals();
+  await saveSettingsToStorage(settings);
+  populateSettingsForm();
+  lastResult = runCalculation();
+  renderResults(lastResult);
+  renderActualsHistory();
+
+  const parts = [];
+  if(adj.step4b) parts.push('Step 4(b) ' + adj.step4b.from.toLocaleString() + ' \u2192 ' + adj.step4b.to.toLocaleString());
+  if(adj.orAllowances) parts.push('OR allowances ' + adj.orAllowances.from + ' \u2192 ' + adj.orAllowances.to);
+  if(adj.deds) adj.deds.forEach(d=> parts.push(d.name + ' ' + d.from + ' \u2192 ' + d.to + d.unit));
+  if(parts.length){
+    showToast('Learned: ' + parts.join(' \u00b7 ') + (notes.length ? ' \u00b7 ' + notes[0] : ''));
+  } else if(notes.length){
+    showToast(notes[0]);
+  } else if(!enteredKeys.length){
+    showToast('Perfect week banked \u2014 stub matched the projection line for line');
+  } else {
+    showToast('Confirmed \u2014 everything within tolerance, logged for the record');
+  }
+}
+
+async function undoLastLearn(){
+  const last = actualsLog[0];
+  const hasAdj = last && last.adj && (last.adj.step4b || last.adj.orAllowances || (last.adj.deds && last.adj.deds.length));
+  if(!hasAdj){ showToast('Nothing to undo'); return; }
+  if(last.adj.step4b) settings.household.step4bDeduction = last.adj.step4b.from;
+  if(last.adj.orAllowances) settings.household.orAllowances = last.adj.orAllowances.from;
+  if(last.adj.deds) last.adj.deds.forEach(d=>{
+    if(settings.otherDeductions[d.i]) settings.otherDeductions[d.i].amount = d.from;
+  });
+  actualsLog.shift();
+  await saveActuals();
+  await saveSettingsToStorage(settings);
+  populateSettingsForm();
+  if(lastResult){ lastResult = runCalculation(); renderResults(lastResult); }
+  renderActualsHistory();
+  showToast('Rolled back last learn');
+}
+
+function renderActualsHistory(){
+  const table = document.getElementById('actualsHistoryTable');
+  const acc = document.getElementById('actualsAccuracy');
+  const undoBtn = document.getElementById('undoLearnBtn');
+  if(!actualsLog.length){
+    table.style.display = 'none'; undoBtn.style.display = 'none';
+    acc.textContent = 'No stubs logged yet. First one usually gets it within a dollar; two or three and it\u2019s dialed.';
+    return;
+  }
+  function missOf(e){
+    if(typeof e.miss === 'number') return e.miss;
+    // v9-shape entries
+    if(e.actNet !== null && e.actNet !== undefined) return e.actNet - e.predNet;
+    let m = 0;
+    if(e.actFed !== null && e.actFed !== undefined) m += (e.predFed - e.actFed);
+    if(e.actOr !== null && e.actOr !== undefined) m += (e.predOr - e.actOr);
+    return -m;
+  }
+  const recent = actualsLog.slice(0, 5);
+  const avg = recent.reduce((s,e)=>s+Math.abs(missOf(e)),0)/recent.length;
+  const perfect = actualsLog.filter(e=>Math.abs(missOf(e)) < 0.005).length;
+  acc.textContent = 'Model record \u2014 last ' + recent.length + ' stub' + (recent.length>1?'s':'') + ': avg miss $' + avg.toFixed(2) +
+    '/wk (before each learn)' + (perfect ? ' \u00b7 ' + perfect + ' perfect week' + (perfect>1?'s':'') + ' banked' : '') + '.';
+  let html = '<tr><th style="text-align:left;">Date</th><th style="text-align:right;">Miss</th><th style="text-align:left;">Learned</th></tr>';
+  actualsLog.slice(0, 6).forEach(e=>{
+    const m = missOf(e);
+    const learned = [];
+    if(e.adj && e.adj.step4b) learned.push('4(b)\u2192' + e.adj.step4b.to.toLocaleString());
+    if(e.adj && e.adj.orAllowances) learned.push('allow\u2192' + e.adj.orAllowances.to);
+    if(e.adj && e.adj.deds) e.adj.deds.forEach(d=>learned.push(d.name + '\u2192' + d.to + d.unit));
+    const note = e.fixedNote ? ' \u26a0' : '';
+    const learnedTxt = learned.length ? learned.join(' \u00b7 ')
+      : (Math.abs(m) < 0.005 && !e.fixedNote ? 'perfect \u2713' : 'no change');
+    html += '<tr><td>' + e.date + (e.taxYear ? ' \u00b7 ' + e.taxYear : '') + '</td>' +
+      '<td style="text-align:right; font-family:\'IBM Plex Mono\',monospace;">' + (m>=0?'+':'\u2212') + '$' + Math.abs(m).toFixed(2) + '</td>' +
+      '<td>' + learnedTxt + note + '</td></tr>';
+  });
+  table.innerHTML = html;
+  table.style.display = 'table';
+  undoBtn.style.display = 'block';
+  const withNote = actualsLog.find(e=>e.fixedNote);
+  if(withNote) acc.textContent += ' \u26a0 ' + withNote.fixedNote + '.';
+}
+
 async function loadDefaultPay(){
   try{ const raw = await storageGet(STORAGE_DEFAULT); return raw ? JSON.parse(raw) : null; }
   catch(e){ reportStorageError('parse default pay', e); return null; }
@@ -1091,6 +1553,7 @@ function renderResults(r){
   renderLadder('fedLadder','fedBracketLabel', r.annualFedBase, (settings.household.multipleJobsCheckbox?settings.fedCheckbox:settings.fed).brackets, r.fedMarginal);
   renderLadder('orLadder','orBracketLabel', r.annualOrBase, settings.oregon.brackets, r.orMarginal);
   renderCompare(r);
+  renderActualsForm(r);
 }
 
 function renderDefaultStrip(){
@@ -1443,11 +1906,16 @@ document.getElementById('saveSettingsBtn').addEventListener('click', async ()=>{
 });
 
 document.getElementById('resetSettingsBtn').addEventListener('click', async ()=>{
-  if(!confirm('Reset all settings — household, tax rates, and custom deductions — to the built-in 2026 defaults? This cannot be undone.')) return;
+  const yr = latestKnownTaxData.year;
+  if(!confirm('Reset all settings — household, tax rates, and custom deductions — to the ' + yr + ' defaults? This cannot be undone.')) return;
   settings = JSON.parse(JSON.stringify(DEFAULTS));
+  // Never regress to older tables: re-apply the newest tax data seen this
+  // session (remote if it was fetched, otherwise the built-ins).
+  applyTaxConstants(settings, latestKnownTaxData);
   await saveSettingsToStorage(settings);
   populateSettingsForm();
-  showToast('Reset to 2026 defaults');
+  updateTaxYearUI();
+  showToast('Reset to ' + yr + ' defaults');
 });
 
 // ---------- init ----------
@@ -1455,12 +1923,22 @@ async function init(){
   settings = await loadSettings();
   defaultPay = await loadDefaultPay();
   compareSlots = await loadCompareSlots();
+  actualsLog = await loadActuals();
   const savedInputs = await loadInputs();
 
+  document.getElementById('learnBtn').addEventListener('click', learnFromActuals);
+  document.getElementById('undoLearnBtn').addEventListener('click', undoLastLearn);
+  renderActualsHistory();
+
   populateSettingsForm();
+  updateTaxYearUI();
   renderDefaultStrip();
   await renderDailyRows();
   applyInputs(savedInputs);
+
+  // Non-blocking: check the repo for newer tax tables. If found, settings
+  // update, the form and any visible results re-render, and a toast shows.
+  checkRemoteTaxData();
 
   // Real cross-reload proof, not a claim: this counter only goes up if
   // whatever backend we used actually survived a page reload. A successful
