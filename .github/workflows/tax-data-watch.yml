@@ -1,0 +1,148 @@
+# Tax data autopilot for the Take-Home paycheck app.
+#
+# Files this expects in the repo:
+#   .github/workflows/tax-data-watch.yml   (this file)
+#   .github/scripts/update-tax-data.py     (the extractor)
+#   tax-data.json                          (what the app reads)
+#
+# Jobs:
+#   1. validate — every push touching tax-data.json gets schema-checked, so a
+#      bad manual edit fails with a red X instead of being silently rejected
+#      on devices.
+#   2. autopilot — scheduled. When a new tax year's sources are published
+#      (SSA wage base, IRS inflation adjustments, Oregon Pub 150-206-436),
+#      it extracts the numbers, runs them through guardrails (rates must be
+#      unchanged, thresholds within 0..+12% of last year), validates, and
+#      commits the new tax-data.json itself. Every device picks it up on the
+#      next page open. If anything looks like legislation instead of
+#      inflation — or a source changed format — it opens a GitHub Issue
+#      (which emails you) instead of committing. The app's paystub learning
+#      keeps predictions accurate off actual stubs either way.
+#
+# Notes:
+#   - Pushes made with GITHUB_TOKEN don't retrigger workflows, so the commit
+#     here won't re-run the validate job. That's fine: the script performs
+#     the same validation (plus guardrails) before it ever writes the file.
+#   - GitHub pauses schedules in repos with ~60 days of no activity; this
+#     repo is active, and the app's amber stale-year banner is the backstop.
+
+name: Tax data autopilot
+
+on:
+  push:
+    paths:
+      - 'tax-data.json'
+  schedule:
+    - cron: '0 17 * 1,11,12 1,4'   # Mon + Thu, 9am Pacific, Jan/Nov/Dec (publication window)
+    - cron: '0 17 1 2-10 *'        # 1st of the month, Feb-Oct backstop
+  workflow_dispatch:
+    inputs:
+      force_year:
+        description: 'Test run: force a target year (always dry-run, never commits)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  validate:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tax-data.json
+        run: python3 .github/scripts/update-tax-data.py --check-file --file tax-data.json
+
+  autopilot:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pdftotext
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+      - name: Run autopilot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_YEAR: ${{ github.event.inputs.force_year }}
+        run: |
+          set -uo pipefail
+
+          MONTH=$(date -u +%m)
+          YEAR=$(date -u +%Y)
+          DRY=""
+          if [ -n "${FORCE_YEAR}" ]; then
+            TARGET="${FORCE_YEAR}"
+            DRY="--dry-run"
+            echo "Forced test run for ${TARGET} (dry-run)."
+          elif [ "$MONTH" = "11" ] || [ "$MONTH" = "12" ]; then
+            TARGET=$((YEAR + 1))
+          else
+            TARGET=$YEAR
+          fi
+          echo "Target tax year: ${TARGET}"
+
+          set +e
+          python3 .github/scripts/update-tax-data.py --target "${TARGET}" ${DRY} 2>&1 | tee autopilot.log
+          CODE=${PIPESTATUS[0]}
+          set -e
+          echo "Extractor exit code: ${CODE}"
+
+          if [ "${CODE}" = "3" ] || [ "${CODE}" = "4" ]; then
+            echo "Nothing to do yet."
+            exit 0
+          fi
+
+          if [ "${CODE}" = "0" ]; then
+            if [ -n "${DRY}" ]; then
+              echo "Dry run complete — no commit."
+              exit 0
+            fi
+            if git diff --quiet -- tax-data.json; then
+              echo "No changes to commit."
+              exit 0
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add tax-data.json
+            git commit -m "Tax tables ${TARGET} (autopilot)" \
+              -m "Extracted from SSA, IRS, and Oregon DOR publications; guardrails and schema validation passed. See the Actions log for the old->new diff."
+            git push
+            echo "Committed ${TARGET} tax tables. Devices update on next page open."
+            exit 0
+          fi
+
+          # Exit 2 (or anything unexpected): escalate via issue, deduped by title.
+          EXISTING=$(gh issue list --state open --search "\"Tax tables ${TARGET}\" in:title" --json number --jq 'length' || echo 0)
+          if [ "${EXISTING}" != "0" ]; then
+            echo "Escalation issue for ${TARGET} already open."
+            exit 0
+          fi
+
+          TAIL=$(tail -n 25 autopilot.log)
+          BODY=$(cat <<EOF
+          The autopilot could not safely write **${TARGET}** tax tables — a source changed shape, or a number moved in a way inflation can't explain (usually means new legislation). It refused to commit and needs one human touch.
+
+          Last lines from the run:
+
+          \`\`\`
+          ${TAIL}
+          \`\`\`
+
+          Sources:
+          - Oregon formulas: https://www.oregon.gov/dor/forms/FormsPubs/withholding-tax-formulas_206-436_${TARGET}.pdf
+          - IRS Pub 15-T: https://www.irs.gov/publications/p15t
+          - IRS inflation adjustments: https://www.irs.gov/newsroom (search "tax inflation adjustments for tax year ${TARGET}")
+          - SSA wage base: https://www.ssa.gov/oact/cola/cbb.html
+
+          Fastest fix: hand this issue and the Oregon PDF to Claude and ask for
+          "tax-data.json for ${TARGET} for the Take-Home app," then commit it.
+          The push auto-validates, devices update on next open, and the autopilot
+          goes back to sleep because the year matches.
+          EOF
+          )
+          gh issue create \
+            --title "Tax tables ${TARGET}: autopilot needs a human" \
+            --body "$BODY"
+          echo "Escalation issue created for ${TARGET}."
