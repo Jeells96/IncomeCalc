@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Take-Home — Oregon Paycheck Ledger</title>
+<meta name="theme-color" content="#1a3d33">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Take-Home">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="64x64" href="data:image/png;base64,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">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -199,7 +206,7 @@
   <div id="taxYearBanner" style="display:none; background:var(--amber); color:#fff; padding:10px 14px; border-radius:8px; font-size:12.5px; font-family:'IBM Plex Mono',monospace; margin-bottom:14px;"></div>
 
   <div class="masthead">
-    <div class="eyebrow">Weekly Wage Ledger · v9.2</div>
+    <div class="eyebrow">Weekly Wage Ledger · v9.3</div>
     <h1>Take-Home</h1>
     <p>Oregon · Married Filing Jointly · Tax year <span id="taxYearLabel">2026</span></p>
   </div>
@@ -247,9 +254,9 @@
       <div class="field-row">
         <div class="field"><label>Hourly rate ($)</label><input type="number" id="hourlyRateDaily" step="0.01" value="30.00"></div>
       </div>
-      <p class="section-sub" style="margin-bottom:10px;">Daily thresholds (from Settings → Hours) split each day into regular / time-and-a-half / double-time automatically.</p>
+      <p class="section-sub" style="margin-bottom:10px;">Each day splits into regular / 1.5&times; / 2&times; automatically: weekdays after the daily thresholds (Settings &rarr; Hours), <strong>Saturdays all at 1.5&times;, Sundays all at 2&times;</strong>.</p>
       <table class="daily-table">
-        <thead><tr><th>Day</th><th>Hours worked</th></tr></thead>
+        <thead><tr><th>Day</th><th>Hours worked</th><th>Breakdown</th></tr></thead>
         <tbody id="dailyRows"></tbody>
       </table>
       <div class="daily-hint" id="dailyBreakdownHint"></div>
@@ -278,6 +285,8 @@
     </details>
 
     <button class="btn btn-primary" id="calcBtn">Calculate take-home pay</button>
+    <button class="btn btn-secondary" id="saveWageBtn" style="margin-top:10px;">Save wage info</button>
+    <p class="settings-note" style="margin-top:8px;">Your rate and hours are only stored when you tap Save — calculate as many what-ifs as you like without changing what's saved.</p>
   </section>
 
   <!-- RESULTS PANEL -->
@@ -306,6 +315,11 @@
     </div>
 
     <div id="compareBox"></div>
+
+    <details class="advanced" id="hourValueCard" style="display:none;">
+      <summary>Hour-by-hour value — is the next hour worth it?</summary>
+      <div id="hourValueBody"></div>
+    </details>
 
     <details class="advanced" id="actualsCard">
       <summary>Log actual paycheck — learns from every stub</summary>
@@ -1371,6 +1385,47 @@ function applyInputs(saved){
   }
 }
 
+// Daily overtime rules. Weekdays: straight up to the daily OT threshold,
+// time-and-a-half up to the DT threshold, double-time beyond. Saturdays bill
+// entirely at 1.5x; Sundays entirely at 2x. (Sat maps to the OT bucket, Sun
+// to the DT bucket, so they follow the 1.5x / 2x multipliers in Settings.)
+const SAT_IDX = 5, SUN_IDX = 6;
+function splitDayHours(dayIndex, hours){
+  const h = Math.max(0, hours);
+  if(dayIndex === SUN_IDX) return { reg:0, ot:0, dt:h };
+  if(dayIndex === SAT_IDX) return { reg:0, ot:h, dt:0 };
+  const otT = settings.hours.dailyOtThreshold, dtT = settings.hours.dailyDtThreshold;
+  return {
+    reg: Math.min(h, otT),
+    ot: Math.min(Math.max(0, h-otT), Math.max(0, dtT-otT)),
+    dt: Math.max(0, h-dtT)
+  };
+}
+// Which tier does the Nth hour of a given day fall in? (1-based hour number.)
+function tierOfHour(dayIndex, hourNumber){
+  if(hourNumber <= 0) return null;
+  if(dayIndex === SUN_IDX) return 'dt';
+  if(dayIndex === SAT_IDX) return 'ot';
+  const otT = settings.hours.dailyOtThreshold, dtT = settings.hours.dailyDtThreshold;
+  if(hourNumber <= otT) return 'reg';
+  if(hourNumber <= dtT) return 'ot';
+  return 'dt';
+}
+function bucketsFromDayHours(arr){
+  let reg=0, ot=0, dt=0;
+  arr.forEach((h,i)=>{ const s = splitDayHours(i, h); reg+=s.reg; ot+=s.ot; dt+=s.dt; });
+  return { reg, ot, dt };
+}
+function daySplitLabel(dayIndex, hours){
+  if(hours <= 0) return '—';
+  const s = splitDayHours(dayIndex, hours);
+  const parts = [];
+  if(s.reg>0) parts.push(s.reg + ' reg');
+  if(s.ot>0) parts.push(s.ot + ' @1.5\u00d7');
+  if(s.dt>0) parts.push(s.dt + ' @2\u00d7');
+  return parts.join(' \u00b7 ');
+}
+
 function computeGrossAndHours(){
   const mode = getActivePayMode();
   if(mode === 'weeklyHourly'){
@@ -1385,12 +1440,9 @@ function computeGrossAndHours(){
     const rate = parseFloat(document.getElementById('hourlyRateDaily').value)||0;
     let reg=0, ot=0, dt=0;
     document.querySelectorAll('.daily-hours-input').forEach(input=>{
-      const hrs = parseFloat(input.value)||0;
-      const otT = settings.hours.dailyOtThreshold, dtT = settings.hours.dailyDtThreshold;
-      const dReg = Math.min(hrs, otT);
-      const dOt = Math.min(Math.max(0, hrs-otT), Math.max(0,dtT-otT));
-      const dDt = Math.max(0, hrs-dtT);
-      reg += dReg; ot += dOt; dt += dDt;
+      const dayIndex = parseInt(input.dataset.day, 10) || 0;
+      const s = splitDayHours(dayIndex, parseFloat(input.value)||0);
+      reg += s.reg; ot += s.ot; dt += s.dt;
     });
     const gross = reg*rate + ot*rate*settings.hours.otMultiplier + dt*rate*settings.hours.dtMultiplier;
     return { gross, totalHours: reg+ot+dt, breakdown:{reg,ot,dt,rate} };
@@ -1401,33 +1453,33 @@ function computeGrossAndHours(){
 }
 
 // ---------- core calculation ----------
-function runCalculation(){
-  const payMode = getActivePayMode();
-  const { gross: grossWeekly, totalHours, breakdown } = computeGrossAndHours();
+function readPayOpts(){
+  return {
+    k401: parseFloat(document.getElementById('preTax401k').value)||0,
+    cafeteria: parseFloat(document.getElementById('preTaxCafeteria').value)||0,
+    ytdGross: parseFloat(document.getElementById('ytdGross').value)||0,
+    ytdSSWages: parseFloat(document.getElementById('ytdSSWages').value)||0,
+    ytdOtPremium: parseFloat(document.getElementById('ytdOtPremium').value)||0
+  };
+}
+
+// Pure tax + net for a given gross, hours worked, and qualifying OT premium.
+// Everything that decides withholding flows through here, so the live result
+// and the marginal per-hour math can never disagree.
+function taxAndNet(grossWeekly, totalHours, otPremiumThisCheck, opts){
   const h = settings.household;
-  const k401 = parseFloat(document.getElementById('preTax401k').value)||0;
-  const cafeteria = parseFloat(document.getElementById('preTaxCafeteria').value)||0;
-  const ytdGross = parseFloat(document.getElementById('ytdGross').value)||0;
-  const ytdSSWages = parseFloat(document.getElementById('ytdSSWages').value)||0;
-  const ytdOtPremium = parseFloat(document.getElementById('ytdOtPremium').value)||0;
+  const k401 = opts.k401||0, cafeteria = opts.cafeteria||0;
+  const ytdGross = opts.ytdGross||0, ytdSSWages = opts.ytdSSWages||0, ytdOtPremium = opts.ytdOtPremium||0;
 
   const incomeTaxableWeekly = Math.max(0, grossWeekly - k401 - cafeteria);
   const ficaTaxableWeekly = Math.max(0, grossWeekly - cafeteria);
 
-  // Qualifying FLSA overtime premium (the "half" of time-and-a-half only —
-  // any CBA-only double-time add-on above 1.5x isn't FLSA-required, so it
-  // doesn't qualify under OBBBA's "No Tax on Overtime" definition).
-  let otPremiumThisCheck = 0;
-  if(breakdown){
-    otPremiumThisCheck = (breakdown.ot + breakdown.dt) * breakdown.rate * 0.5;
-  }
   const remainingOtCap = Math.max(0, settings.fed.otExemptAnnualCap - ytdOtPremium);
   const otExemptThisCheck = settings.fed.otExemptEnabled ? Math.min(otPremiumThisCheck, remainingOtCap) : 0;
   const fedTaxableWeekly = Math.max(0, incomeTaxableWeekly - otExemptThisCheck);
 
   // ----- Federal -----
-  const useCheckbox = h.multipleJobsCheckbox;
-  const fedTable = useCheckbox ? settings.fedCheckbox : settings.fed;
+  const fedTable = h.multipleJobsCheckbox ? settings.fedCheckbox : settings.fed;
   const annualFedBase = Math.max(0, fedTaxableWeekly*52 - fedTable.standardDeduction - h.step4bDeduction);
   const fedTaxAnnualGross = progressiveTax(annualFedBase, fedTable.brackets);
   const computedCredit = h.kidsUnder17*settings.fed.ctc + h.otherDependents*settings.fed.odc;
@@ -1442,8 +1494,7 @@ function runCalculation(){
   const orStd = h.orAllowances >= 3 ? settings.oregon.stdHigh : settings.oregon.stdLow;
   const annualOrBase = Math.max(0, annualOrWages - fedSubtraction - orStd);
   const orTaxAnnualGross = progressiveTax(annualOrBase, settings.oregon.brackets);
-  const orCreditEligible = annualOrWages <= settings.oregon.creditPhaseout;
-  const orCredit = orCreditEligible ? h.orAllowances*settings.oregon.exemptionCredit : 0;
+  const orCredit = (annualOrWages <= settings.oregon.creditPhaseout) ? h.orAllowances*settings.oregon.exemptionCredit : 0;
   const orTaxAnnual = Math.max(0, orTaxAnnualGross - orCredit);
   const orWeekly = orTaxAnnual/52;
   const orMarginal = marginalRate(annualOrBase, settings.oregon.brackets);
@@ -1452,7 +1503,6 @@ function runCalculation(){
   const remainingSSBase = Math.max(0, settings.fica.ssWageBase - ytdSSWages);
   const ssTaxableThisWeek = Math.min(ficaTaxableWeekly, remainingSSBase);
   const ssTax = ssTaxableThisWeek*settings.fica.ssRate;
-
   const medicareTax = ficaTaxableWeekly*settings.fica.medicareRate;
   const cumulativeAfterThisCheck = ytdGross + ficaTaxableWeekly;
   const overThreshold = Math.max(0, cumulativeAfterThisCheck - settings.fica.addMedicareThreshold);
@@ -1475,9 +1525,6 @@ function runCalculation(){
   });
   const otherDeductionsTotal = otherDeductionLines.reduce((s,l)=>s+l.amount,0);
 
-  // Round each payroll line to the cent before summing — this mirrors how
-  // real payroll systems compute (each line lands on a whole cent), and
-  // avoids sub-penny floating point drift from accumulating across lines.
   const fedWeeklyR = round2(fedWeekly), orWeeklyR = round2(orWeekly), ssTaxR = round2(ssTax),
         medicareTaxR = round2(medicareTax), addMedicareTaxR = round2(addMedicareTax),
         transitTaxR = round2(transitTax), pfmlTaxR = round2(pfmlTax);
@@ -1486,16 +1533,129 @@ function runCalculation(){
   const netWeekly = grossWeekly - k401 - cafeteria - totalTax;
 
   return {
-    grossWeekly, k401, cafeteria, totalHours, payMode, breakdown,
+    grossWeekly, k401, cafeteria, totalHours,
     fedWeekly: fedWeeklyR, orWeekly: orWeeklyR, ssTax: ssTaxR, medicareTax: medicareTaxR,
     addMedicareTax: addMedicareTaxR, transitTax: transitTaxR, pfmlTax: pfmlTaxR,
     otherDeductionLines, otherDeductionsTotal, otExemptThisCheck,
-    totalTax, netWeekly,
-    annualFedBase, annualOrBase, fedMarginal, orMarginal,
-    monthly: netWeekly*52/12, annual: netWeekly*52,
-    grossAnnual: grossWeekly*52,
-    effectiveRate: grossWeekly>0 ? totalTax/grossWeekly : 0
+    totalTax, netWeekly, annualFedBase, annualOrBase, fedMarginal, orMarginal
   };
+}
+
+function runCalculation(){
+  const payMode = getActivePayMode();
+  const { gross: grossWeekly, totalHours, breakdown } = computeGrossAndHours();
+  const opts = readPayOpts();
+  const otPremiumThisCheck = breakdown ? (breakdown.ot + breakdown.dt) * breakdown.rate * 0.5 : 0;
+  const core = taxAndNet(grossWeekly, totalHours, otPremiumThisCheck, opts);
+  return {
+    ...core, payMode, breakdown,
+    monthly: core.netWeekly*52/12, annual: core.netWeekly*52,
+    grossAnnual: grossWeekly*52,
+    effectiveRate: grossWeekly>0 ? core.totalTax/grossWeekly : 0
+  };
+}
+
+// ---------- true value of each hour ----------
+// The take-home value of an hour isn't its raw rate: withholding rises with
+// income, FICA/transit/Paid Leave skim a slice, and per-hour deductions come
+// out too. We measure each hour's real worth by finite difference — net with
+// the hour minus net without it — so bracket bumps and the OT-premium tax
+// break are captured exactly, not approximated.
+function currentDailyHoursArray(){
+  const arr = [0,0,0,0,0,0,0];
+  document.querySelectorAll('.daily-hours-input').forEach(inp=>{
+    const i = parseInt(inp.dataset.day,10); if(i>=0 && i<7) arr[i] = parseFloat(inp.value)||0;
+  });
+  return arr;
+}
+function hourValueBreakdown(){
+  const mode = getActivePayMode();
+  if(mode === 'salary') return null;
+  const opts = readPayOpts();
+  const rate = parseFloat(document.getElementById(mode==='dailyHourly'?'hourlyRateDaily':'hourlyRate').value)||0;
+  if(rate <= 0) return null;
+  const otM = settings.hours.otMultiplier, dtM = settings.hours.dtMultiplier;
+
+  const netFor = (reg,ot,dt)=>{
+    const gross = reg*rate + ot*rate*otM + dt*rate*dtM;
+    const premium = (ot+dt)*rate*0.5;
+    return taxAndNet(gross, reg+ot+dt, premium, opts).netWeekly;
+  };
+
+  const dayHours = mode==='dailyHourly' ? currentDailyHoursArray() : null;
+  const base = mode==='dailyHourly'
+    ? bucketsFromDayHours(dayHours)
+    : { reg: parseFloat(document.getElementById('regHours').value)||0,
+        ot: parseFloat(document.getElementById('otHours').value)||0,
+        dt: parseFloat(document.getElementById('dtHours').value)||0 };
+  const baseNet = netFor(base.reg, base.ot, base.dt);
+  const baseGross = base.reg*rate + base.ot*rate*otM + base.dt*rate*dtM;
+  const baseHours = base.reg + base.ot + base.dt;
+  const basePrem = (base.ot+base.dt)*rate*0.5;
+
+  // Reference: what one more hour at each tier is worth on top of this week.
+  const refTier = (mult)=>{
+    const extraGross = rate*mult, extraPrem = mult>1 ? rate*0.5 : 0;
+    return taxAndNet(baseGross+extraGross, baseHours+1, basePrem+extraPrem, opts).netWeekly - baseNet;
+  };
+  const ref = { reg: refTier(1), ot: refTier(otM), dt: refTier(dtM) };
+
+  // Per-day: value of the last hour worked (what you'd lose leaving early) and
+  // of one more hour (what you'd gain staying), each at that day's real tier.
+  let days = null;
+  if(mode==='dailyHourly'){
+    days = [];
+    dayHours.forEach((hh,i)=>{
+      if(hh <= 0) return;
+      const minus = dayHours.slice(); minus[i] = Math.max(0, hh-1);
+      const plus  = dayHours.slice(); plus[i]  = hh+1;
+      const bm = bucketsFromDayHours(minus), bp = bucketsFromDayHours(plus);
+      days.push({
+        day: DAY_NAMES[i], hours: hh,
+        lastHour: baseNet - netFor(bm.reg,bm.ot,bm.dt), lastTier: tierOfHour(i, hh),
+        nextHour: netFor(bp.reg,bp.ot,bp.dt) - baseNet, nextTier: tierOfHour(i, hh+1)
+      });
+    });
+  }
+
+  return { baseNet, baseGross, baseHours, rate, ref, days,
+           takeHomeRate: baseGross>0 ? baseNet/baseGross : 0,
+           blendedPerHour: baseHours>0 ? baseNet/baseHours : 0 };
+}
+
+function renderHourValue(){
+  const card = document.getElementById('hourValueCard');
+  const body = document.getElementById('hourValueBody');
+  if(!card || !body) return;
+  const hv = hourValueBreakdown();
+  if(!hv){ card.style.display='none'; return; }
+  card.style.display='';
+  const TW = { reg:'straight', ot:'1.5\u00d7', dt:'2\u00d7' };
+  let html = '<p class="settings-note" style="margin:10px 0;">Every figure is take-home \u2014 after federal, Oregon, FICA, transit, Paid Leave and your per-hour deductions. Because withholding climbs with income, an hour is worth less than its raw rate.</p>';
+  html += '<div class="proj-row" style="margin-bottom:8px;">'
+    + '<div class="proj-card"><div class="k">Straight hour</div><div class="v">' + fmt$(hv.ref.reg) + '</div></div>'
+    + '<div class="proj-card"><div class="k">1.5\u00d7 hour</div><div class="v">' + fmt$(hv.ref.ot) + '</div></div>'
+    + '<div class="proj-card"><div class="k">2\u00d7 hour</div><div class="v">' + fmt$(hv.ref.dt) + '</div></div>'
+    + '</div>';
+  html += '<div class="settings-note" style="margin-bottom:10px;">This week: ' + (hv.takeHomeRate*100).toFixed(1)
+    + '% of gross is take-home \u00b7 blended ' + fmt$(hv.blendedPerHour) + '/hr across all hours worked.</div>';
+  if(hv.days){
+    if(hv.days.length){
+      html += '<table class="ledger"><tr><th style="text-align:left;">Day</th><th style="text-align:right;">Leave 1hr early</th><th style="text-align:right;">Stay 1hr more</th></tr>';
+      hv.days.forEach(d=>{
+        html += '<tr><td>' + d.day + ' \u00b7 ' + d.hours + 'h</td>'
+          + '<td style="text-align:right;">\u2212' + fmt$(d.lastHour) + ' <span class="settings-note">' + (TW[d.lastTier]||'') + '</span></td>'
+          + '<td style="text-align:right;">+' + fmt$(d.nextHour) + ' <span class="settings-note">' + (TW[d.nextTier]||'') + '</span></td></tr>';
+      });
+      html += '</table>';
+      html += '<p class="settings-note" style="margin-top:8px;">\u201cLeave 1hr early\u201d is what that last hour actually put in your pocket; \u201cstay 1hr more\u201d is what the next one would. Weekdays flip to 1.5\u00d7 after ' + settings.hours.dailyOtThreshold + 'h and 2\u00d7 after ' + settings.hours.dailyDtThreshold + 'h; Saturdays are 1.5\u00d7, Sundays 2\u00d7.</p>';
+    } else {
+      html += '<p class="settings-note">Enter hours per day above to see the value of each day\u2019s last hour.</p>';
+    }
+  } else {
+    html += '<p class="settings-note">Switch to \u201cHourly \u2014 daily entry\u201d to see the value of the last hour of each specific day.</p>';
+  }
+  body.innerHTML = html;
 }
 
 // ---------- rendering ----------
@@ -1665,6 +1825,7 @@ function renderResults(r){
   renderLadder('orLadder','orBracketLabel', r.annualOrBase, settings.oregon.brackets, r.orMarginal);
   renderCompare(r);
   renderActualsForm(r);
+  renderHourValue();
 }
 
 function renderDefaultStrip(){
@@ -1682,29 +1843,33 @@ function renderDefaultStrip(){
 async function renderDailyRows(){
   const tbody = document.getElementById('dailyRows');
   const saved = await loadDailyHours();
-  tbody.innerHTML = DAY_NAMES.map((d,i)=>`
+  tbody.innerHTML = DAY_NAMES.map((d,i)=>{
+    const wknd = i===SAT_IDX ? ' <span class="settings-note">(1.5\u00d7)</span>' : i===SUN_IDX ? ' <span class="settings-note">(2\u00d7)</span>' : '';
+    return `
     <tr>
-      <td>${d}</td>
-      <td><input type="number" class="daily-hours-input" step="0.25" data-day="${i}" value="${saved[i]!==undefined?saved[i]:0}"></td>
-    </tr>
-  `).join('');
+      <td>${d}${wknd}</td>
+      <td><input type="number" class="daily-hours-input" step="0.25" min="0" data-day="${i}" value="${saved[i]!==undefined?saved[i]:0}"></td>
+      <td class="day-split" data-day-split="${i}" style="font-size:0.85em; color:var(--muted);">\u2014</td>
+    </tr>`;
+  }).join('');
   tbody.querySelectorAll('.daily-hours-input').forEach(inp=>{
     inp.addEventListener('input', updateDailyHint);
   });
   updateDailyHint();
 }
 function updateDailyHint(){
-  const vals = Array.from(document.querySelectorAll('.daily-hours-input')).map(i=>parseFloat(i.value)||0);
-  saveDailyHours(vals);
-  let reg=0, ot=0, dt=0;
-  const otT = settings.hours.dailyOtThreshold, dtT = settings.hours.dailyDtThreshold;
-  vals.forEach(hrs=>{
-    reg += Math.min(hrs, otT);
-    ot += Math.min(Math.max(0, hrs-otT), Math.max(0,dtT-otT));
-    dt += Math.max(0, hrs-dtT);
+  // Live preview only — daily hours persist when you tap Save wage info, not
+  // on every keystroke, so you can explore hours freely without overwriting.
+  const inputs = Array.from(document.querySelectorAll('.daily-hours-input'));
+  const vals = [0,0,0,0,0,0,0];
+  inputs.forEach(inp=>{ const i=parseInt(inp.dataset.day,10); if(i>=0&&i<7) vals[i]=parseFloat(inp.value)||0; });
+  const b = bucketsFromDayHours(vals);
+  vals.forEach((h,i)=>{
+    const cell = document.querySelector('[data-day-split="'+i+'"]');
+    if(cell) cell.textContent = daySplitLabel(i, h);
   });
   document.getElementById('dailyBreakdownHint').textContent =
-    `${reg.toFixed(2)} regular · ${ot.toFixed(2)} time-and-a-half · ${dt.toFixed(2)} double-time`;
+    `${b.reg.toFixed(2)} regular · ${b.ot.toFixed(2)} time-and-a-half · ${b.dt.toFixed(2)} double-time · ${(b.reg+b.ot+b.dt).toFixed(2)} total`;
 }
 
 // ---------- tabs ----------
@@ -1727,39 +1892,56 @@ document.querySelectorAll('.settings-subtab').forEach(btn=>{
   });
 });
 
-// pay mode toggle
+// pay mode toggle (switches the visible fields; does not persist on its own)
 document.querySelectorAll('.seg-btn[data-pay]').forEach(btn=>{
-  btn.addEventListener('click', async ()=>{
+  btn.addEventListener('click', ()=>{
     document.querySelectorAll('.seg-btn[data-pay]').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('weeklyHourlyFields').style.display = btn.dataset.pay==='weeklyHourly' ? 'block':'none';
     document.getElementById('dailyHourlyFields').style.display = btn.dataset.pay==='dailyHourly' ? 'block':'none';
     document.getElementById('salaryFields').style.display = btn.dataset.pay==='salary' ? 'block':'none';
     if(btn.dataset.pay==='dailyHourly') renderDailyRows();
-    await saveInputs(captureInputs());
+    markWageDirty();
   });
 });
 
-// ---------- autosave every calculator field the moment you leave it ----------
-// Don't rely on the Calculate button as the only save point — if you change
-// a value and navigate away or refresh without calculating, it should still
-// be there next time.
-const AUTOSAVE_FIELD_IDS = [
+// ---------- wage info is saved on demand, not automatically ----------
+// Typing a new rate or hours no longer overwrites what's stored — explore
+// freely, then tap "Save wage info" to keep it. We just track whether there
+// are unsaved edits so the button can show it.
+let wageDirty = false;
+function markWageDirty(){
+  wageDirty = true;
+  const btn = document.getElementById('saveWageBtn');
+  if(btn){ btn.textContent = 'Save wage info •'; btn.classList.add('btn-primary'); btn.classList.remove('btn-secondary'); }
+}
+function markWageClean(){
+  wageDirty = false;
+  const btn = document.getElementById('saveWageBtn');
+  if(btn){ btn.textContent = 'Save wage info'; btn.classList.add('btn-secondary'); btn.classList.remove('btn-primary'); }
+}
+const WAGE_FIELD_IDS = [
   'hourlyRate','regHours','otHours','dtHours','hourlyRateDaily','weeklySalary',
   'preTax401k','preTaxCafeteria','ytdGross','ytdSSWages','ytdOtPremium'
 ];
-AUTOSAVE_FIELD_IDS.forEach(id=>{
+WAGE_FIELD_IDS.forEach(id=>{
   const el = document.getElementById(id);
-  if(el){
-    el.addEventListener('blur', async ()=>{ await saveInputs(captureInputs()); });
-    el.addEventListener('change', async ()=>{ await saveInputs(captureInputs()); });
-  }
+  if(el) el.addEventListener('input', markWageDirty);
 });
-// calculate button
-document.getElementById('calcBtn').addEventListener('click', async ()=>{
+document.getElementById('dailyRows').addEventListener('input', markWageDirty);
+
+async function saveWageInfo(){
+  await saveInputs(captureInputs());
+  if(getActivePayMode()==='dailyHourly') await saveDailyHours(currentDailyHoursArray());
+  markWageClean();
+  showToast('Wage info saved');
+}
+document.getElementById('saveWageBtn').addEventListener('click', saveWageInfo);
+
+// calculate button — computes and shows results; does NOT persist wage info
+document.getElementById('calcBtn').addEventListener('click', ()=>{
   lastResult = runCalculation();
   renderResults(lastResult);
-  await saveInputs(captureInputs());
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-results').classList.add('active');
@@ -2066,6 +2248,7 @@ async function init(){
   renderDefaultStrip();
   await renderDailyRows();
   applyInputs(savedInputs);
+  markWageClean();
 
   // Non-blocking: check the repo for newer tax tables. If found, settings
   // update, the form and any visible results re-render, and a toast shows.
